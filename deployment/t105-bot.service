@@ -1,0 +1,22 @@
+[Unit]
+Description=Team105 Threshold Crushers - Roostoo autonomous trading bot
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO__
+# Secrets live outside the repo, readable by root only; systemd injects them as env vars.
+EnvironmentFile=/etc/t105/deployment.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__REPO__/.venv/bin/python scripts/run_bot.py --profile deployment
+# Crash -> restart. On restart the bot rebuilds positions from the exchange (no double orders).
+Restart=always
+RestartSec=20
+StartLimitIntervalSec=0
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
