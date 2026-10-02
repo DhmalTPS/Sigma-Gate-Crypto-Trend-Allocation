@@ -1,6 +1,10 @@
-# Team105 · Threshold Crushers (IIT Mandi)
+# Sigma Gate: Crypto Trend Allocation
 
-Autonomous trading bot for the **HK vs AU vs IN Quant Trading Hackathon 2026**
+*Volatility-targeted trend-gate allocation across crypto majors, with fee-aware execution
+and drawdown-governed risk.*
+
+**Team105 · Threshold Crushers (IIT Mandi)**: an autonomous trading bot for the
+**HK vs AU vs IN Quant Trading Hackathon 2026**
 (Roostoo mock exchange · Susquehanna · AWS). It runs unattended on AWS EC2, trades
 only through the Roostoo REST API, and logs every decision, order and fill.
 
