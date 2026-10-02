@@ -38,6 +38,7 @@ class PolicyParams:
     dd_soft: float = 0.03        # start de-risking at 3% drawdown from peak
     dd_hard: float = 0.10        # minimum exposure reached at 10%
     dd_floor: float = 0.25
+    dd_peak_window_h: int = 336  # drawdown measured from the rolling 14-day peak (= contest length)
     band_abs: float = 0.02       # do not trade a name unless |dw| > 2% NAV ...
     band_rel: float = 0.25       # ... or > 25% of its target
     min_trade_usd: float = 50.0
@@ -47,6 +48,17 @@ class PolicyParams:
 class PolicyState:
     peak_nav: float = 0.0
     active: dict = field(default_factory=dict)   # pair -> +1 / -1 for open positions (hysteresis)
+    nav_hist: list = field(default_factory=list)  # recent decision-time NAVs for the rolling peak
+
+    def update_peak(self, nav: float, window: int) -> float:
+        if window <= 0:
+            self.peak_nav = max(self.peak_nav, nav)
+            return self.peak_nav
+        self.nav_hist.append(nav)
+        if len(self.nav_hist) > window:
+            del self.nav_hist[: len(self.nav_hist) - window]
+        self.peak_nav = max(self.nav_hist)
+        return self.peak_nav
 
 
 def shrunk_cov(returns: np.ndarray, shrink: float) -> np.ndarray:
@@ -78,7 +90,7 @@ def target_weights(alpha: pd.Series, vol: pd.Series, regime: pd.Series, recent_r
                    current_w: pd.Series, nav: float, st: PolicyState, p: PolicyParams,
                    shorts_enabled: bool = True) -> tuple[pd.Series, dict]:
     """Return (final target weights, diagnostics). Weights are signed fractions of NAV."""
-    st.peak_nav = max(st.peak_nav, nav)
+    st.update_peak(nav, p.dd_peak_window_h)
     a = alpha.dropna()
     trend = float(regime.get("mkt_trend", 0.0) or 0.0)
     risk_on = float(np.clip(regime.get("risk_on", 0.5) if pd.notna(regime.get("risk_on")) else 0.5, 0, 1))

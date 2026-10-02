@@ -28,7 +28,7 @@ class StrategyParams:
     max_tick_bps: float = 5.0             # exclude coins whose 1-tick spread is expensive
     universe: tuple = ()                  # whitelist; empty = all eligible crypto pairs
     gate_lookbacks: tuple = (168, 336, 720)
-    gate_dead_band: float = 0.25          # 0 = plain sign gates
+    gate_dead_band: float = 0.5           # 0 = plain sign gates (research R6: plateau 0.25-1.0)
     # ensemble
     sleeves: tuple = ("trend", "xsmom", "reversal")
     prior_weights: dict = field(default_factory=lambda: {"trend": 0.45, "xsmom": 0.35, "reversal": 0.20})

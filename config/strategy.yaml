@@ -1,12 +1,13 @@
 # Team105 production strategy configuration. Every live change must be a git
 # commit to this file (or code) with a CHANGELOG entry -- see docs/CHANGE_CONTROL.md.
-version: "v1.0-trend-gate-majors"
+version: "v1.1-gate-deadband"
 
 strategy:
   sleeves: ["tgate"]
   prior_weights: {tgate: 1.0}
   universe: ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD"]
   gate_lookbacks: [168, 336, 720]      # 7d / 14d / 30d -- an ensemble, not a tuned single value
+  gate_dead_band: 0.5                  # gate flips only when |z| > 0.5 sigma (R6: kills hourly churn)
   vol_halflife: 72
   min_history_h: 720
   min_daily_usd: 5000000
@@ -25,6 +26,7 @@ policy:
   dd_soft: 0.03
   dd_hard: 0.10
   dd_floor: 0.25
+  dd_peak_window_h: 336                # drawdown from rolling 14-day peak
   band_abs: 0.03                       # trade a name only if |dw| > 3% NAV ...
   band_rel: 0.20                       # ... or > 20% of its target
   min_trade_usd: 50

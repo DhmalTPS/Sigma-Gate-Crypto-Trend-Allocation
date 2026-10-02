@@ -43,7 +43,8 @@ class ShadowBook:
 
     def __init__(self, name: str, pol: PolicyParams, cost_bps: float = 8.0):
         self.name, self.pol, self.cost = name, pol, cost_bps / 1e4
-        self.nav, self.w, self.st = 1.0, pd.Series(dtype=float), PolicyState(peak_nav=1.0)
+        # NAV in dollars so min-trade-size filters behave as in the real book
+        self.nav, self.w, self.st = 100_000.0, pd.Series(dtype=float), PolicyState(peak_nav=100_000.0)
         self.last_px: pd.Series | None = None
 
     def step(self, out, px: pd.Series, t) -> dict:
@@ -55,7 +56,7 @@ class ShadowBook:
         turn = float((w_new - self.w.reindex(w_new.index).fillna(0)).abs().sum())
         self.nav *= 1 - turn * self.cost
         self.w, self.last_px = w_new[w_new != 0], px
-        return {"shadow": self.name, "nav": self.nav, "gross": float(self.w.abs().sum())}
+        return {"shadow": self.name, "nav": round(self.nav, 2), "gross": round(float(self.w.abs().sum()), 4)}
 
 
 class Bot:
@@ -175,7 +176,8 @@ class Bot:
         # 5) policy
         cur_val = bk.signed_values(mids)
         cur_w = pd.Series(cur_val, dtype=float) / nav if nav > 0 else pd.Series(dtype=float)
-        st = PolicyState(peak_nav=self.state["peak_nav"], active=self.state.get("active", {}))
+        st = PolicyState(peak_nav=self.state["peak_nav"], active=self.state.get("active", {}),
+                         nav_hist=self.state.get("nav_hist", []))
         breaker = time.time() < self.state.get("breaker_until", 0)
         if 1 - nav / self.state["peak_nav"] >= L.breaker_dd and not breaker:
             self.state["breaker_until"] = time.time() + L.breaker_cooldown_h * 3600
@@ -186,6 +188,7 @@ class Bot:
         if breaker:
             w = w * 0.0
         self.state["active"] = st.active
+        self.state["nav_hist"] = st.nav_hist
 
         # 6) orders
         orders = self._execute(w, cur_w, bk, nav, mids, ex, urgent=breaker or diag.get("dd_mult", 1) < 0.6)
