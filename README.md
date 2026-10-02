@@ -210,7 +210,7 @@ python scripts/smoke_test.py                       # read-only, testing account
 python scripts/run_bot.py --profile testing --dry-run --once
 ```
 
-Deploy on EC2: see `deployment/install.sh` (the keys go in `/etc/t105/deployment.env`, never in git).
+Deploy on the organizer-provided EC2 (Sydney, t3.medium, Session Manager): follow [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Keys go in `/etc/t105/deployment.env` on the VM, never in git.
 
 ## 10. Limitations (honest)
 
