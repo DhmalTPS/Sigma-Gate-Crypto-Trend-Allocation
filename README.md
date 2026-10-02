@@ -140,7 +140,7 @@ backtest number over a single market cycle shows little on its own.
 
 ## 7. Live operations during the 14 days
 
-* **Shadow portfolios** (long-only, neutral, half-gross) run alongside the real
+* **Shadow portfolios** (no-shorts, 20 % and 40 % vol target) run alongside the real
   book on the same signals, giving counterfactual evidence before any change.
 * **Change control:** five tiers, from infra fixes (always allowed) to
   strategy replacement (needs very strong evidence); never retune because of

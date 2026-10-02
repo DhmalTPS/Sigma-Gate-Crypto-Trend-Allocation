@@ -105,18 +105,20 @@ class Bot:
             log.warning("configured pairs not tradeable on this account: %s", sorted(missing))
         self.broker = Broker(self.client, self.pairs, self.audit)
         self.comp = Compliance(self.cfg["risk"], set(self.universe), self.audit)
-        self.market = LiveMarket(self.client, self.universe, self.live_cfg.get("lookback_h", 24 * 60))
+        self.market = LiveMarket(self.client, self.universe, self.live_cfg.get("lookback_h", 24 * 60),
+                                 local_dir=self.root / "data" / "bootstrap")
         log.info("bootstrapping %d pairs of hourly history ...", len(self.universe))
         self.market.bootstrap()
         self.market.refresh_ticker()
         pol = self.cfg["policy"]
         from dataclasses import replace
-        self.shadows = [ShadowBook("long_only", replace(pol, mode="long_only")),
-                        ShadowBook("neutral", replace(pol, mode="neutral")),
-                        ShadowBook("cash_heavy", replace(pol, max_gross=0.5))]
+        # Counterfactuals on the same signals: one per parameter we might be tempted to change.
+        self.shadows = [ShadowBook("no_shorts", replace(pol, mode="long_only")),
+                        ShadowBook("vol_target_20", replace(pol, target_vol_ann=0.20)),
+                        ShadowBook("vol_target_40", replace(pol, target_vol_ann=0.40))]
         self.audit.write("health", {"event": "startup", "profile": self.profile, "dry_run": self.dry,
                                     "version": self.cfg["version"], "universe": len(self.universe),
-                                    "bars_loaded": len(self.market.bars),
+                                    "bars_loaded": len(self.market.bars), "bar_sources": self.market.sources,
                                     "clock_offset_ms": self.client.offset_ms})
 
     # ------------------------------------------------------------ helpers
@@ -190,7 +192,11 @@ class Bot:
         self.state["active"] = st.active
         self.state["nav_hist"] = st.nav_hist
 
-        # 6) orders
+        # 6) orders (deployment keys never trade before the contest window opens)
+        not_before = pd.Timestamp(self.live_cfg.get("trade_not_before_utc", "1970-01-01"), tz="UTC")             if self.profile == "deployment" else pd.Timestamp(0, tz="UTC")
+        if pd.Timestamp.now(tz="UTC") < not_before:
+            self.audit.write("health", {"event": "pre_contest_hold", "until": str(not_before)})
+            w = cur_w.reindex(w.index).fillna(0.0) if len(cur_w) else w * 0.0
         orders = self._execute(w, cur_w, bk, nav, mids, ex, urgent=breaker or diag.get("dd_mult", 1) < 0.6)
 
         # 7) daily activity guard: >= 8 active days required -> make sure each day trades

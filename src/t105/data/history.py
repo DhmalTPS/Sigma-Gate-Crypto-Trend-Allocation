@@ -72,6 +72,58 @@ def fetch_klines(symbol: str, interval: str = "1h", start_ms: int | None = None,
     return df
 
 
+OKX_URL = "https://www.okx.com/api/v5/market/history-candles"
+
+
+def fetch_klines_okx(roostoo_pair: str, hours: int, session: requests.Session | None = None) -> pd.DataFrame:
+    """Secondary source (Binance blocks some cloud regions). Hourly, closed bars only."""
+    s = session or requests.Session()
+    inst = roostoo_pair.split("/")[0] + "-USDT"
+    rows, after = [], None
+    while len(rows) < hours:
+        params = {"instId": inst, "bar": "1H", "limit": 100}
+        if after:
+            params["after"] = after
+        r = s.get(OKX_URL, params=params, timeout=15)
+        r.raise_for_status()
+        data = r.json().get("data", [])
+        if not data:
+            break
+        rows.extend(data)
+        after = data[-1][0]
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows, columns=["ts", "open", "high", "low", "close", "volume", "vol_ccy", "quote_volume",
+                                     "confirm"])
+    df = df[df["confirm"] == "1"]
+    df.index = pd.to_datetime(df["ts"].astype("int64"), unit="ms", utc=True)
+    df = df[["open", "high", "low", "close", "volume", "quote_volume"]].astype(float)
+    return df[~df.index.duplicated()].sort_index()
+
+
+def fetch_with_fallback(roostoo_pair: str, start_ms: int, end_ms: int, local_dir: Path | None = None) -> tuple[pd.DataFrame, str]:
+    """Binance -> OKX -> bundled local snapshot. Returns (bars, source)."""
+    try:
+        df = fetch_klines(binance_symbol(roostoo_pair), "1h", start_ms, end_ms)
+        if not df.empty:
+            return df, "binance"
+    except Exception as e:  # noqa: BLE001
+        log.warning("binance %s failed: %s", roostoo_pair, e)
+    try:
+        hours = int((end_ms - start_ms) / 3_600_000) + 2
+        df = fetch_klines_okx(roostoo_pair, hours)
+        df = df[df.index >= pd.Timestamp(start_ms, unit="ms", tz="UTC")]
+        if not df.empty:
+            return df, "okx"
+    except Exception as e:  # noqa: BLE001
+        log.warning("okx %s failed: %s", roostoo_pair, e)
+    if local_dir is not None:
+        f = local_dir / f"{binance_symbol(roostoo_pair)}_1h.csv.gz"
+        if f.exists():
+            return pd.read_csv(f, index_col=0, parse_dates=True), "local"
+    return pd.DataFrame(), "none"
+
+
 def load_universe_history(pairs: list[str], interval: str, days: int, cache_dir: Path,
                           refresh: bool = False) -> dict[str, pd.DataFrame]:
     """Download (or load cached) history for each Roostoo pair."""

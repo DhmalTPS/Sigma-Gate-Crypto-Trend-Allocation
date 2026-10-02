@@ -16,13 +16,18 @@ import numpy as np
 import pandas as pd
 
 from ..api.client import RoostooClient
-from ..data.history import binance_symbol, fetch_klines
+from pathlib import Path
+
+from ..data.history import binance_symbol, fetch_klines, fetch_with_fallback
 
 log = logging.getLogger(__name__)
 
 
 class LiveMarket:
-    def __init__(self, client: RoostooClient, pairs: list[str], lookback_h: int = 24 * 60):
+    def __init__(self, client: RoostooClient, pairs: list[str], lookback_h: int = 24 * 60,
+                 local_dir: Path | None = None):
+        self.local_dir = local_dir
+        self.sources: dict[str, str] = {}
         self.c = client
         self.pairs = pairs
         self.lookback_h = lookback_h
@@ -70,13 +75,12 @@ class LiveMarket:
         end = int(time.time() * 1000)
         start = end - self.lookback_h * 3_600_000
         for p in self.pairs:
-            try:
-                df = fetch_klines(binance_symbol(p), "1h", start, end)
-            except Exception as e:      # noqa: BLE001
-                log.error("bootstrap %s failed: %s", p, e)
-                df = pd.DataFrame()
-            if not df.empty:
-                self.bars[p] = df
+            df, src = fetch_with_fallback(p, start, end, self.local_dir)
+            self.sources[p] = src
+            if df.empty:
+                log.error("bootstrap %s: no history from any source", p)
+                continue
+            self.bars[p] = df.iloc[-self.lookback_h:]
 
     def update_bars(self) -> None:
         """Append newly closed hourly bars (Binance, else Roostoo-snapshot fallback)."""
@@ -87,13 +91,10 @@ class LiveMarket:
             last = df.index[-1] if df is not None and len(df) else now_h - pd.Timedelta(hours=self.lookback_h)
             if last >= now_h - pd.Timedelta(hours=1):
                 continue
-            new = pd.DataFrame()
-            try:
-                new = fetch_klines(binance_symbol(p), "1h", int((last + pd.Timedelta(hours=1)).timestamp() * 1000),
-                                   int(time.time() * 1000))
-            except Exception as e:      # noqa: BLE001
+            new, src = fetch_with_fallback(p, int((last + pd.Timedelta(hours=1)).timestamp() * 1000),
+                                           int(time.time() * 1000))
+            if src != "binance":
                 fails += 1
-                log.warning("binance update %s failed: %s", p, e)
             if new.empty:
                 new = self._snapshot_bar(p, now_h - pd.Timedelta(hours=1))
             if not new.empty:
