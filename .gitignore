@@ -1,0 +1,21 @@
+# --- SECRETS: never commit ---
+extra_info/
+.env
+*.key
+*secret*
+*api_key*
+
+# runtime artefacts
+logs/*
+!logs/.gitkeep
+state/*
+!state/.gitkeep
+data/cache/
+reports/backtest/*.csv
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/

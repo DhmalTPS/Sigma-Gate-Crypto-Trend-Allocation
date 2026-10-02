@@ -1,0 +1,38 @@
+# Competition contract -- single source of truth for rules the bot must obey.
+# Source: organizer Luma page + resource-pack email (Sep 30 2026). These values
+# OVERRIDE the example numbers in the generic Roostoo API docs ($50k / 0.012%).
+competition:
+  name: "HK vs AU vs IN Quant Trading Hackathon 2026"
+  team: "Team105-Threshold Crushers (IIT Mandi)"
+  live_start_utc: "2026-10-04T00:00:00Z"   # Oct 4 - Oct 17 (14 full days)
+  live_end_utc: "2026-10-18T00:00:00Z"
+  min_active_trading_days: 8                # "at least 8 active trading days with enough trades"
+
+capital:
+  initial_usd: 100000
+
+instruments:
+  spot_only: true
+  leverage: 1.0             # no leverage: gross exposure <= NAV
+  long: true
+  short: true               # "1x long and short" -- via /v6 collateralised shorts
+  quote: "USD"
+
+fees:                        # fraction of notional
+  taker: 0.0010              # market order
+  maker: 0.0005              # resting limit order
+  short_open: 0.0010         # /v6 short endpoints charge 0.1% regardless of order type
+  short_close: 0.0010
+
+prohibited:                  # enforced in risk/compliance.py
+  high_frequency_trading: true
+  market_making: true
+  arbitrage: true
+  manual_trading: true       # all orders must originate from the bot loop
+
+api:
+  base_url: "https://mock-api.roostoo.com"
+  timestamp_tolerance_ms: 60000
+  # Organizer: "Excessive server requests will result in failed API responses."
+  # No published limit, so we self-impose a conservative budget.
+  max_requests_per_minute: 30
