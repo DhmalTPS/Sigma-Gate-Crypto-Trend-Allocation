@@ -71,6 +71,16 @@ def reversal_sleeve(resid: pd.DataFrame, eligible: pd.DataFrame, vol: pd.DataFra
     return -xs_rank(z, eligible)
 
 
+def trend_gate_sleeve(logp: pd.DataFrame, lookbacks=(168, 336, 720)) -> pd.DataFrame:
+    """Ensemble of slow trend gates: mean over lookbacks of sign(log return over lb).
+
+    Values in {-1, -1/3, +1/3, +1}. Averaging gates over several lookbacks instead
+    of tuning one is the robustness choice: research showed the Sharpe surface is
+    smooth across +/-25% lookback perturbations, whereas single lookbacks vary a lot.
+    """
+    return sum(np.sign(logp - logp.shift(lb)) for lb in lookbacks) / len(lookbacks)
+
+
 def eligibility(close: pd.DataFrame, quote_vol: pd.DataFrame, min_history: int = 24 * 30,
                 min_daily_usd: float = 5e6) -> pd.DataFrame:
     """Asset is tradeable at t if it has enough history and real liquidity."""

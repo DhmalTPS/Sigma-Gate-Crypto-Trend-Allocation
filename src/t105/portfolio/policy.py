@@ -20,6 +20,7 @@ import pandas as pd
 @dataclass
 class PolicyParams:
     mode: str = "long_only"      # long_only | long_short | neutral
+    sizing: str = "normalize"    # normalize: scale book to gross budget | absolute: alpha x inverse-vol basket
     use_regime_gross: bool = False    # research: trend-timing of gross exposure did NOT help
     enter: float = 0.30          # |alpha| to open a position
     exit: float = 0.10           # |alpha| below which an open position is closed
@@ -106,6 +107,8 @@ def target_weights(alpha: pd.Series, vol: pd.Series, regime: pd.Series, recent_r
         return _band(w, current_w, nav, p), {"gross": 0.0, "risk_on": risk_on, "dd_mult": 1.0, "n": 0}
 
     s = pd.Series(sel)
+    if p.sizing == "absolute":
+        return _absolute(s, alpha, vol, recent_returns, current_w, nav, st, p, risk_on, trend, can_short)
     v = vol.reindex(s.index).replace(0, np.nan).fillna(vol.median())
     raw = s / (v * np.sqrt(24))              # risk-budget: alpha per unit of daily vol
     raw[raw < 0] *= p.short_scale
@@ -146,6 +149,38 @@ def target_weights(alpha: pd.Series, vol: pd.Series, regime: pd.Series, recent_r
     w = raw.reindex(current_w.index.union(raw.index).union(alpha.index)).fillna(0.0)
     diag = {"gross": float(w.abs().sum()), "net": float(w.sum()), "risk_on": risk_on,
             "mkt_trend": trend, "dd_mult": m, "ex_ante_vol": port_vol, "n": int((w != 0).sum()),
+            "can_short": can_short}
+    return _band(w, current_w, nav, p), diag
+
+
+def _absolute(s, alpha, vol, recent_returns, current_w, nav, st, p, risk_on, trend, can_short):
+    """Exposure = signal x inverse-vol basket weight; the *full* basket is scaled to
+    the vol target. So with every gate on we are fully invested at target vol, with
+    one of five gates on we hold only that slice -- exposure falls as trends break,
+    instead of being re-normalised back up to 100%."""
+    uni = alpha.dropna().index
+    v = vol.reindex(uni).replace(0, np.nan)
+    v = v.fillna(v.median())
+    base = (1 / v) / (1 / v).sum()
+    cols = [c for c in uni if c in recent_returns.columns]
+    rr = recent_returns[cols].tail(p.cov_window).values
+    scale, port_vol = 1.0, float("nan")
+    if len(rr) > 48 and cols:
+        cov = shrunk_cov(rr, p.cov_shrink) * 24 * 365
+        b = base.reindex(cols).values
+        port_vol = float(np.sqrt(max(b @ cov @ b, 1e-12)))
+        scale = min(1.0, p.target_vol_ann / port_vol)
+    raw = s * base.reindex(s.index) * scale
+    raw[raw < 0] *= p.short_scale
+    caps = pd.Series({k: (p.max_weight_major if k in p.majors else p.max_weight) for k in raw.index})
+    raw = raw.clip(-caps, caps)
+    if raw.abs().sum() > p.max_gross:
+        raw = raw / raw.abs().sum() * p.max_gross
+    m = drawdown_multiplier(nav, st.peak_nav, p)
+    raw = raw * m
+    w = raw.reindex(current_w.index.union(raw.index).union(alpha.index)).fillna(0.0)
+    diag = {"gross": float(w.abs().sum()), "net": float(w.sum()), "risk_on": risk_on, "mkt_trend": trend,
+            "dd_mult": m, "basket_vol": port_vol, "vol_scale": scale, "n": int((w != 0).sum()),
             "can_short": can_short}
     return _band(w, current_w, nav, p), diag
 

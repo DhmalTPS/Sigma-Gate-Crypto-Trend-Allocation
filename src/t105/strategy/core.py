@@ -26,6 +26,8 @@ class StrategyParams:
     min_daily_usd: float = 5e6
     min_history_h: int = 24 * 30
     max_tick_bps: float = 5.0             # exclude coins whose 1-tick spread is expensive
+    universe: tuple = ()                  # whitelist; empty = all eligible crypto pairs
+    gate_lookbacks: tuple = (168, 336, 720)
     # ensemble
     sleeves: tuple = ("trend", "xsmom", "reversal")
     prior_weights: dict = field(default_factory=lambda: {"trend": 0.45, "xsmom": 0.35, "reversal": 0.20})
@@ -91,6 +93,9 @@ def compute(close: pd.DataFrame, quote_vol: pd.DataFrame, p: StrategyParams,
     elig = S.eligibility(close, quote_vol, p.min_history_h, p.min_daily_usd)
     if price_precision:
         elig &= tick_bps(close, price_precision) <= p.max_tick_bps
+    if p.universe:
+        elig &= pd.DataFrame(np.isin(close.columns, p.universe)[None, :].repeat(len(close), 0),
+                             index=close.index, columns=close.columns)
     rm = S.market_return(lr, elig)
     beta = S.rolling_beta(lr, rm)
     resid = lr - beta.mul(rm, axis=0)
@@ -100,6 +105,8 @@ def compute(close: pd.DataFrame, quote_vol: pd.DataFrame, p: StrategyParams,
         sleeves["trend"] = S.trend_sleeve(logp, vol, p.trend_horizons).where(elig)
     if "xsmom" in p.sleeves:
         sleeves["xsmom"] = S.xsmom_sleeve(resid, elig, vol, p.xsmom_lookback, p.xsmom_skip)
+    if "tgate" in p.sleeves:
+        sleeves["tgate"] = S.trend_gate_sleeve(logp, p.gate_lookbacks).where(elig)
     if "reversal" in p.sleeves:
         sleeves["reversal"] = S.reversal_sleeve(resid, elig, vol, p.reversal_lookback)
 
