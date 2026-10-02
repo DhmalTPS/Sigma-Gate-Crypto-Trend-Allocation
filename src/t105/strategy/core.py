@@ -28,6 +28,7 @@ class StrategyParams:
     max_tick_bps: float = 5.0             # exclude coins whose 1-tick spread is expensive
     universe: tuple = ()                  # whitelist; empty = all eligible crypto pairs
     gate_lookbacks: tuple = (168, 336, 720)
+    gate_dead_band: float = 0.25          # 0 = plain sign gates
     # ensemble
     sleeves: tuple = ("trend", "xsmom", "reversal")
     prior_weights: dict = field(default_factory=lambda: {"trend": 0.45, "xsmom": 0.35, "reversal": 0.20})
@@ -106,7 +107,10 @@ def compute(close: pd.DataFrame, quote_vol: pd.DataFrame, p: StrategyParams,
     if "xsmom" in p.sleeves:
         sleeves["xsmom"] = S.xsmom_sleeve(resid, elig, vol, p.xsmom_lookback, p.xsmom_skip)
     if "tgate" in p.sleeves:
-        sleeves["tgate"] = S.trend_gate_sleeve(logp, p.gate_lookbacks).where(elig)
+        if p.gate_dead_band > 0:
+            sleeves["tgate"] = S.trend_gate_hysteresis(logp, vol, p.gate_lookbacks, p.gate_dead_band).where(elig)
+        else:
+            sleeves["tgate"] = S.trend_gate_sleeve(logp, p.gate_lookbacks).where(elig)
     if "reversal" in p.sleeves:
         sleeves["reversal"] = S.reversal_sleeve(resid, elig, vol, p.reversal_lookback)
 

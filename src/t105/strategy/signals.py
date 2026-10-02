@@ -81,6 +81,27 @@ def trend_gate_sleeve(logp: pd.DataFrame, lookbacks=(168, 336, 720)) -> pd.DataF
     return sum(np.sign(logp - logp.shift(lb)) for lb in lookbacks) / len(lookbacks)
 
 
+def trend_gate_hysteresis(logp: pd.DataFrame, vol: pd.DataFrame, lookbacks=(168, 336, 720),
+                          dead_band: float = 0.25) -> pd.DataFrame:
+    """Same gates, but each one only switches when the vol-normalised trend
+    z = log(P_t/P_{t-lb}) / (sigma_1h * sqrt(lb)) leaves a dead band of +/-dead_band;
+    inside the band the previous state is carried (causal ffill).
+
+    Why: evaluated hourly, a gate whose trend sits near zero flips back and forth
+    every few hours, and each flip turns over a whole position (measured: 110x NAV
+    turnover vs ~10x for the same rule sampled daily). The band removes noise
+    crossings without delaying genuine trend changes by more than a few hours.
+    """
+    parts = []
+    for lb in lookbacks:
+        z = (logp - logp.shift(lb)) / (vol * np.sqrt(lb))
+        g = pd.DataFrame(np.where(z > dead_band, 1.0, np.where(z < -dead_band, -1.0, np.nan)),
+                         index=z.index, columns=z.columns)
+        g = g.ffill().where(z.notna()).fillna(0.0)
+        parts.append(g)
+    return sum(parts) / len(parts)
+
+
 def eligibility(close: pd.DataFrame, quote_vol: pd.DataFrame, min_history: int = 24 * 30,
                 min_daily_usd: float = 5e6) -> pd.DataFrame:
     """Asset is tradeable at t if it has enough history and real liquidity."""
