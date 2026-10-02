@@ -176,6 +176,7 @@ class RoostooClient:
     def pending_count(self) -> ApiResult:
         r = self._request("GET", "/v3/pending_count", {}, signed=True)
         if not r.ok and "no pending order" in r.err:      # documented: Success=false when zero
+            self.consecutive_failures = 0
             return ApiResult(True, {"TotalPending": 0, "OrderPairs": {}}, latency_ms=r.latency_ms)
         return r
 
@@ -191,6 +192,7 @@ class RoostooClient:
                  "offset": None if offset is None else str(offset)}
         r = self._request("POST", "/v3/query_order", p, signed=True)
         if not r.ok and "no order matched" in r.err:
+            self.consecutive_failures = 0
             return ApiResult(True, {"OrderMatched": []}, latency_ms=r.latency_ms)
         return r
 

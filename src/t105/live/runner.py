@@ -96,7 +96,12 @@ class Bot:
             raise RuntimeError(f"exchangeInfo failed: {info.err}")
         self.pairs = parse_exchange_info(info.data)
         self.pp = price_precisions(info.data)
-        self.universe = [p for p in crypto_pairs(info.data) if self.pairs[p].can_trade]
+        whitelist = set(self.cfg["strategy"].universe)
+        self.universe = [p for p in crypto_pairs(info.data) if self.pairs[p].can_trade
+                         and (not whitelist or p in whitelist)]
+        missing = whitelist - set(self.universe)
+        if missing:
+            log.warning("configured pairs not tradeable on this account: %s", sorted(missing))
         self.broker = Broker(self.client, self.pairs, self.audit)
         self.comp = Compliance(self.cfg["risk"], set(self.universe), self.audit)
         self.market = LiveMarket(self.client, self.universe, self.live_cfg.get("lookback_h", 24 * 60))
@@ -265,6 +270,9 @@ class Bot:
                         not (kind == "short_close" and tw >= 0):
                     continue
                 reducing = kind in ("SELL", "short_close")
+                cap = self.cfg["risk"].max_order_frac * nav
+                if not reducing and usd > cap:      # slice: the next cycle completes the rest
+                    amt, usd = amt * cap / usd, cap
                 gross_after = gross + (-usd if reducing else usd) / nav
                 ok, why = self.comp.check(p, kind if kind in ("BUY", "SELL") else "SHORT", usd, nav,
                                           gross_after, {}, True, n, risk_reducing=reducing)
