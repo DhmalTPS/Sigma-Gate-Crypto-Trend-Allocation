@@ -80,6 +80,27 @@ the best-looking row (choosing the max of a grid is how backtests get overfit).
 Half-size shorts cut MaxDD by a quarter (Calmar is 30 % of the score) — adopted.
 Shorts on Roostoo cost 0.1 % per leg regardless of order type, so they are sized smaller.
 
+## R6. Hourly gate churn and the dead-band — `research/gate_churn.py`
+
+The vectorised research (R4/R5) rebalanced daily. The full hourly engine exposed a gap:
+a gate whose trend sits near zero flips sign every few hours, and each flip turns over a
+whole position. Plain sign gates: **110× NAV turnover, $8.5k fees, Sharpe 0.10**.
+
+| Dead-band (σ) | Turnover | Fees | Sharpe | MaxDD |
+|---|---|---|---|---|
+| 0 | 110× | $8,533 | 0.10 | 13.1 % |
+| 0.25 | 39× | $2,857 | 0.49 | 10.8 % |
+| **0.5** | 19× | $1,375 | 0.44 | 11.5 % |
+| 1.0 | 13× | $964 | 0.56 | 10.7 % |
+
+(before the rolling-peak fix below). Plateau 0.25–1.0 → we take the middle, 0.5σ.
+
+**Drawdown governor peak.** Measured from the all-time peak, the governor kept a
+16-month backtest de-risked for months (avg gross 0.16). The contest is 14 days, so the
+governor now uses the **rolling 14‑day peak**, which gives the same behaviour during the
+contest and an honest backtest. Result (v1.1): Sharpe 0.94, MaxDD 10.5 %, fees $3.1k;
+all 13 single-parameter perturbations positive (README §6).
+
 ## Honest limitations
 
 * 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.

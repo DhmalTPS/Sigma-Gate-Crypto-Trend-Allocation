@@ -54,7 +54,7 @@ All research is reproducible (`research/*.py`) on 540 days of hourly data for al
    ensemble rather than the best-looking row.
 5. **Half-size shorts (R5)** cut max drawdown from 21 % to 16 % and raised Sharpe.
 6. **Gate dead-band (R6).** In the full hourly engine, plain sign gates flipped
-   whenever a trend sat near zero (110× NAV turnover). A ±0.25σ dead-band fixes
+   whenever a trend sat near zero (110× NAV turnover). A ±0.5σ dead-band fixes
    this; see §6.
 
 ## 3. Strategy
@@ -63,7 +63,7 @@ For each coin *i* in {BTC, ETH, SOL, BNB, XRP} and each lookback *L* ∈ {168, 3
 
 ```
 z_iL = log(P_t / P_{t-L}) / (σ_i,1h · √L)            vol-normalised trend
-g_iL = +1 if z > +0.25, −1 if z < −0.25, else previous g    (dead-band)
+g_iL = +1 if z > +0.5, −1 if z < −0.5, else previous g      (dead-band)
 s_i  = mean_L g_iL  ∈ {−1, −⅓, +⅓, +1}
 ```
 
@@ -130,7 +130,40 @@ every 5 min: NAV snapshot + intra-hour circuit breaker
 
 ## 6. Backtest (production config, full engine, net of fees)
 
-BACKTEST_TABLE
+Period 2025‑05‑25 → 2026‑10‑02 (≈ 16 months, hourly decisions, $100k start, all fees):
+
+| Metric | **Team105 v1.1** | EW majors buy & hold |
+|---|---|---|
+| Total return | **+20.9 %** | −8.7 % |
+| Annualised vol | 16.4 % | ≈ 55 % |
+| Sharpe / Sortino | **0.94 / 1.33** | 0.12 / 0.17 |
+| Max drawdown | **10.5 %** | 63.4 % |
+| Calmar (raw) | 1.99 | −0.14 |
+| Probabilistic Sharpe (P[SR > 0]) | 0.86 | — |
+| Bootstrap P(Sharpe > 0), 90 % CI | 0.85, [−0.48, 2.38] | — |
+| Fees paid · turnover | $3,133 · 41× NAV | — |
+| Maker share of notional | 46 % | — |
+
+**Contest-length view.** Every 14‑day window in the backtest (481 windows):
+10th / 50th / 90th percentile return **−2.6 % / −0.3 % / +4.4 %**; 90th‑percentile
+drawdown **4.9 %**, worst drawdown 6.1 %. Outcomes are positively skewed: small
+losses, larger wins.
+
+**Fragility table** (each row changes one parameter; base Sharpe 0.94):
+
+| Change | Sharpe | MaxDD | | Change | Sharpe | MaxDD |
+|---|---|---|---|---|---|---|
+| lookbacks ×0.75 | 1.27 | 10.0 % | | no shorts | 0.80 | 16.5 % |
+| lookbacks ×1.25 | 1.26 | 9.2 % | | full-size shorts | 0.91 | 14.8 % |
+| vol half-life 36h | 0.97 | 10.9 % | | band 1.5 % | 0.89 | 12.0 % |
+| vol half-life 144h | 0.88 | 11.4 % | | band 6 % | 0.56 | 17.4 % |
+| vol target 20 % | 0.90 | 9.1 % | | DD soft 2 % | 0.90 | 10.4 % |
+| vol target 40 % | 0.71 | 14.4 % | | DD soft 5 % | 0.91 | 11.6 % |
+| taker-only execution | 0.88 | 10.9 % | | | | |
+
+Every perturbation stays positive with no cliffs. The chosen values are
+not the in-sample best (lookbacks ×0.75 would score higher); we keep the
+centred, pre-registered values.
 
 How to read it: these numbers come from the same `compute` → `target_weights`
 path that runs live, with conservative fills. We also report the distribution
