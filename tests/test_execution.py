@@ -101,3 +101,37 @@ def test_oversized_buy_is_sliced_to_order_cap(tmp_path):
     bot._execute(pd.Series({"BTC/USD": 0.4}), pd.Series(dtype=float), bk, 1e5, mids, bot.cfg["execution"], urgent=False)
     assert len(bot.broker.calls) == 1
     assert abs(bot.broker.calls[0][3] * 100.0 - 25_000) < 1     # capped at 25% NAV this cycle
+
+
+class _Res:
+    def __init__(self, ok, data=None, err=""):
+        self.ok, self.data, self.err = ok, data or {}, err
+
+
+class _Client:
+    def __init__(self, short_err):
+        self.short_err = short_err
+
+    def balance(self):
+        return _Res(True, {"SpotWallet": {"USD": {"Free": 100000, "Lock": 0}}})
+
+    def short_positions(self):
+        return _Res(False, err=self.short_err)
+
+
+def test_no_permission_does_not_disable_shorts(tmp_path):
+    from t105.execution.broker import Broker
+    b = Broker(_Client("your do not have permission to trade"), {}, Audit(tmp_path))
+    bk = b.book()
+    assert bk is not None and bk.usd_free == 100000
+    assert b.shorts_supported            # pre-contest "no permission" must not kill shorts
+
+
+def test_does_not_allow_disables_then_rechecks(tmp_path):
+    from t105.execution.broker import Broker
+    b = Broker(_Client("this competition does not allow short positions"), {}, Audit(tmp_path))
+    assert b.book() is not None and not b.shorts_supported
+    b.shorts_retry_at = 0.0               # recheck window elapsed
+    b.c.short_err = "boom"
+    b.book()
+    assert b.shorts_supported or b.shorts_retry_at > 0

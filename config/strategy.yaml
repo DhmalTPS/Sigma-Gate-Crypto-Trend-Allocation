@@ -49,6 +49,6 @@ live:
   cycle_offset_s: 90                   # run 90s after the hour so the bar is closed everywhere
   activity_guard_hour_utc: 18          # if no fill yet today by 18:00 UTC, make the smallest strategy trade
   cycle_on_start: true
-  # Contest: Oct 4 - Oct 17. Oct 4 00:00 HKT = Oct 3 16:00 UTC. Before this the bot runs, logs
+  # Contest opens Oct 5 08:00 HKT = Oct 5 00:00 UTC (organizer). Before this the bot runs, logs
   # and computes targets on the competition account but sends no orders.
-  trade_not_before_utc: "2026-10-03T16:00:00"
+  trade_not_before_utc: "2026-10-05T00:00:00"

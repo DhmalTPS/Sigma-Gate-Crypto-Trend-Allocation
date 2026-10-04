@@ -58,9 +58,21 @@ class Broker:
         self.pairs = pairs
         self.audit = audit
         self.shorts_supported = True
+        self.shorts_retry_at = 0.0
+
+    SHORTS_RECHECK_S = 6 * 3600
+
+    def _disable_shorts(self, why: str) -> None:
+        """Only an explicit 'competition does not allow short positions' disables shorts,
+        and even then we re-check periodically (rules/permissions can change)."""
+        log.warning("shorts disabled for %dh: %s", self.SHORTS_RECHECK_S // 3600, why)
+        self.shorts_supported = False
+        self.shorts_retry_at = time.time() + self.SHORTS_RECHECK_S
 
     # ------------------------------------------------------------ state
     def book(self) -> Book | None:
+        if not self.shorts_supported and time.time() >= self.shorts_retry_at:
+            self.shorts_supported = True
         b = self.c.balance()
         if not b.ok:
             log.error("balance failed: %s", b.err)
@@ -81,9 +93,12 @@ class Broker:
                                             "entry": float(p.get("EntryPrice", 0) or 0),
                                             "collateral": float(p.get("Collateral", 0) or 0),
                                             "upnl": float(p.get("UnrealizedPNL", 0) or 0)}
-            elif "does not allow" in s.err or "permission" in s.err:
-                log.warning("shorts unavailable on this account: %s", s.err)
-                self.shorts_supported = False
+            elif "does not allow" in s.err:
+                self._disable_shorts(s.err)
+            elif "permission" in s.err:
+                # account-wide "no permission to trade" (e.g. before the contest opens):
+                # no position can exist, and it must NOT switch shorts off for later.
+                log.warning("short_positions: %s (treating as no open shorts)", s.err)
             else:
                 log.error("short_positions failed: %s -- treating book as unknown", s.err)
                 return None
@@ -145,8 +160,8 @@ class Broker:
             return None
         r = self.c.short_open(pair, coll)
         self._record("short_open", pair, {"collateral": coll}, r, why)
-        if not r.ok and ("does not allow" in r.err or "permission" in r.err):
-            self.shorts_supported = False
+        if not r.ok and "does not allow" in r.err:
+            self._disable_shorts(r.err)
         return r.data if r.ok else None
 
     def short_close(self, pair: str, qty: float | None, why: str) -> dict | None:
