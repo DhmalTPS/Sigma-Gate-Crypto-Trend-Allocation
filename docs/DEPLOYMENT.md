@@ -98,8 +98,9 @@ sudo systemctl status t105-bot --no-pager       # should say: active (running)
 journalctl -u t105-bot -f                       # live log; Ctrl+C stops watching only
 ```
 
-It is safe to start **before** Oct 4: until `trade_not_before_utc` (Oct 3 16:00 UTC =
-Oct 4 00:00 HKT) the deployment profile computes and logs targets but sends no orders.
+It is safe to start before the contest opens: until `trade_not_before_utc` (Oct 4 12:00 UTC =
+20:00 HKT = 17:30 IST, the organizer's start) the deployment profile computes and logs targets
+but sends no orders.
 
 **Alternative (organizer's tmux method)** — only if systemd is not usable:
 ```bash
@@ -112,8 +113,9 @@ tmux does **not** restart the bot after a crash or VM reboot — systemd does.
 
 ## 9. Daily routine Oct 4 – 17 (5 minutes)
 
-1. Connect via Session Manager → `cd ~/t105 && bash deployment/healthcheck.sh`
-   → service RUNNING, recent NAV line, few API failures.
+1. Connect via Session Manager and run the read-only status report:
+   `cd ~/t105 && git pull -q && (set -a; source <(sudo cat /etc/t105/deployment.env); set +a; .venv/bin/python scripts/report.py)`
+   → service active, NAV/drawdown, fills, **active trading days** (rule: ≥ 8).
 2. Compare real NAV with the shadow books in `decision.jsonl`.
 3. Any change → `docs/CHANGE_CONTROL.md` → commit + push on laptop →
    on VM: `git pull && sudo systemctl restart t105-bot`.
