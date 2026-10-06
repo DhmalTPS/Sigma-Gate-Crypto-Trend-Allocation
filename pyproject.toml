@@ -1,0 +1,26 @@
+[project]
+name = "sigma-gate-crypto-trend-allocation"
+version = "1.1.1"
+description = "Autonomous, volatility-targeted crypto trend-gate allocation bot for the Roostoo mock exchange (HK x AU x IN Quant Trading Hackathon 2026)."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "DhmalTPS" }]
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "pandas>=2.1", "requests>=2.31", "PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.5", "matplotlib>=3.8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["t105"]
