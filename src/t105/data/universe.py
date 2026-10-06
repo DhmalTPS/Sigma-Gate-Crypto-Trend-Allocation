@@ -1,4 +1,5 @@
 """Universe definition + loading the research panel from cache."""
+
 from __future__ import annotations
 
 import json
@@ -11,8 +12,27 @@ from .history import binance_symbol
 # Tokenised equities listed on Roostoo (suffix "B"): short histories, equity-market
 # hours drive their price discovery, and our crypto signals were not designed for them.
 TOKENISED_EQUITIES = {
-    "AMDB", "SNDKB", "QCOMB", "NBISB", "MSFTB", "GOOGLB", "INTCB", "PLTRB", "METAB", "CRCLB",
-    "MUB", "SKHYB", "MSTRB", "CBRSB", "LITEB", "TSLAB", "COINB", "NVDAB", "GLWB", "WDCB", "SPCXB",
+    "AMDB",
+    "SNDKB",
+    "QCOMB",
+    "NBISB",
+    "MSFTB",
+    "GOOGLB",
+    "INTCB",
+    "PLTRB",
+    "METAB",
+    "CRCLB",
+    "MUB",
+    "SKHYB",
+    "MSTRB",
+    "CBRSB",
+    "LITEB",
+    "TSLAB",
+    "COINB",
+    "NVDAB",
+    "GLWB",
+    "WDCB",
+    "SPCXB",
 }
 # Gold token: near-zero crypto beta, fine as an asset but excluded from the crypto
 # factor so it does not distort the market-return estimate.
@@ -20,8 +40,9 @@ EXCLUDE = TOKENISED_EQUITIES | {"PAXG"}
 
 
 def crypto_pairs(exchange_info: dict) -> list[str]:
-    return sorted(p for p, v in exchange_info["TradePairs"].items()
-                  if v.get("CanTrade") and p.split("/")[0] not in EXCLUDE)
+    return sorted(
+        p for p, v in exchange_info["TradePairs"].items() if v.get("CanTrade") and p.split("/")[0] not in EXCLUDE
+    )
 
 
 def price_precisions(exchange_info: dict) -> dict[str, int]:

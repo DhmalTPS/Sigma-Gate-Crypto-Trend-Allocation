@@ -12,6 +12,7 @@ the live bot uses maker orders for most of these trades).
 
 usage: python research/beta_research.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -45,11 +46,21 @@ def simulate(w: pd.DataFrame, r: pd.DataFrame, reb: int, cost: float = COST) -> 
 def stats(name: str, nav: pd.Series) -> dict:
     s = M.summary(nav)
     w = M.rolling_window_stats(nav, 24 * 14, 48)
-    return {"variant": name, "ret": s["total_return"], "vol": s["ann_vol"], "sharpe": s["sharpe"],
-            "mdd": s["max_drawdown"], "calmar_raw": s["calmar_raw"], "psr": s["psr_vs_0"],
-            "w_med_ret": w["ret"].median(), "w_p_pos": (w["ret"] > 0).mean(),
-            "w_q10": w["ret"].quantile(0.1), "w_med_mdd": w["mdd"].median(), "w_q90_mdd": w["mdd"].quantile(0.9),
-            "w_med_sharpe": w["sharpe"].median()}
+    return {
+        "variant": name,
+        "ret": s["total_return"],
+        "vol": s["ann_vol"],
+        "sharpe": s["sharpe"],
+        "mdd": s["max_drawdown"],
+        "calmar_raw": s["calmar_raw"],
+        "psr": s["psr_vs_0"],
+        "w_med_ret": w["ret"].median(),
+        "w_p_pos": (w["ret"] > 0).mean(),
+        "w_q10": w["ret"].quantile(0.1),
+        "w_med_mdd": w["mdd"].median(),
+        "w_q90_mdd": w["mdd"].quantile(0.9),
+        "w_med_sharpe": w["sharpe"].median(),
+    }
 
 
 def main() -> None:
@@ -61,9 +72,9 @@ def main() -> None:
     start = close.index[24 * 60]
     rm = r.mean(axis=1)
     idx = np.log1p(rm.fillna(0)).cumsum()
-    vol_m = np.sqrt((rm ** 2).ewm(halflife=72, min_periods=48).mean()) * np.sqrt(8760)
+    vol_m = np.sqrt((rm**2).ewm(halflife=72, min_periods=48).mean()) * np.sqrt(8760)
     ew = elig.astype(float).div(elig.sum(axis=1), axis=0)
-    vol_i = np.sqrt((lr ** 2).ewm(halflife=72, min_periods=48).mean())
+    vol_i = np.sqrt((lr**2).ewm(halflife=72, min_periods=48).mean())
 
     rows = []
     sl = slice(start, None)
@@ -77,7 +88,7 @@ def main() -> None:
         rows.append(stats(f"EW_voltarget{tv}", simulate(ew.mul(scale, axis=0).loc[sl], r.loc[sl], 24)))
 
     for lb in (168, 336, 504, 720):
-        z = (idx - idx.shift(lb))
+        z = idx - idx.shift(lb)
         on = (z > 0).astype(float)
         rows.append(stats(f"EW_trend{lb}h", simulate(ew.mul(on, axis=0).loc[sl], r.loc[sl], 24)))
         scale = (0.4 / vol_m).clip(upper=1.0)
@@ -95,7 +106,9 @@ def main() -> None:
             mkt_on = ((idx - idx.shift(336)) > 0).astype(float)
             scale = (0.4 / vol_m).clip(upper=1.0)
             rows.append(stats(f"XS_top{K}_lb{lb}", simulate(w.loc[sl], r.loc[sl], 24)))
-            rows.append(stats(f"XS_top{K}_lb{lb}+mkt336+vt", simulate(w.mul(mkt_on * scale, axis=0).loc[sl], r.loc[sl], 24)))
+            rows.append(
+                stats(f"XS_top{K}_lb{lb}+mkt336+vt", simulate(w.mul(mkt_on * scale, axis=0).loc[sl], r.loc[sl], 24))
+            )
 
     df = pd.DataFrame(rows)
     pd.set_option("display.width", 250)

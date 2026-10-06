@@ -19,8 +19,7 @@ from t105.strategy.core import StrategyParams, compute  # noqa: E402
 
 # ------------------------------------------------------------------ API
 def test_signature_matches_roostoo_doc_example():
-    params = {"pair": "BNB/USD", "quantity": "2000", "side": "BUY", "timestamp": "1580774512000",
-              "type": "MARKET"}
+    params = {"pair": "BNB/USD", "quantity": "2000", "side": "BUY", "timestamp": "1580774512000", "type": "MARKET"}
     total, sig = sign("S1XP1e3UZj6A7H5fATj0jNhqPxxdSJYdInClVN65XAbvqqMKjVHjA7PZj4W12oep", params)
     assert total == "pair=BNB/USD&quantity=2000&side=BUY&timestamp=1580774512000&type=MARKET"
     assert sig == "20b7fd5550b67b3bf0c1684ed0f04885261db8fdabd38611e9e6af23c19b7fff"
@@ -28,10 +27,10 @@ def test_signature_matches_roostoo_doc_example():
 
 def test_pairinfo_rounding_never_crosses():
     pi = PairInfo("BTC/USD", "BTC", 2, 5, 1.0, True)
-    assert pi.fmt_qty(0.123456789) == "0.12345"          # floor, never round up
-    assert pi.round_price(100.019, "BUY") == 100.01      # buys round down
-    assert pi.round_price(100.011, "SELL") == 100.02     # sells round up
-    assert not pi.valid(0.00001, 50.0)                   # below MiniOrder notional
+    assert pi.fmt_qty(0.123456789) == "0.12345"  # floor, never round up
+    assert pi.round_price(100.019, "BUY") == 100.01  # buys round down
+    assert pi.round_price(100.011, "SELL") == 100.02  # sells round up
+    assert not pi.valid(0.00001, 50.0)  # below MiniOrder notional
 
 
 # ------------------------------------------------------------------ metrics
@@ -99,8 +98,8 @@ def test_strategy_is_causal():
 # ------------------------------------------------------------------ compliance
 def test_compliance_blocks(tmp_path):
     c = Compliance(RiskLimits(), {"BTC/USD"}, Audit(tmp_path))
-    assert not c.check("DOGE/USD", "BUY", 100, 1e5, 0.5, {}, True, 0)[0]          # not in universe
-    assert not c.check("BTC/USD", "BUY", 50_000, 1e5, 0.5, {}, True, 0)[0]         # > 25% NAV
-    assert not c.check("BTC/USD", "BUY", 100, 1e5, 1.2, {}, True, 0)[0]            # leverage
+    assert not c.check("DOGE/USD", "BUY", 100, 1e5, 0.5, {}, True, 0)[0]  # not in universe
+    assert not c.check("BTC/USD", "BUY", 50_000, 1e5, 0.5, {}, True, 0)[0]  # > 25% NAV
+    assert not c.check("BTC/USD", "BUY", 100, 1e5, 1.2, {}, True, 0)[0]  # leverage
     assert not c.check("BTC/USD", "BUY", 100, 1e5, 0.5, {"BTC/USD": {"SELL"}}, True, 0)[0]  # MM-like
     assert c.check("BTC/USD", "SELL", 60_000, 1e5, 0.2, {}, True, 0, risk_reducing=True)[0]

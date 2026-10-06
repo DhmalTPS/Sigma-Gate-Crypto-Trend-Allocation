@@ -13,6 +13,7 @@ Outputs (time-indexed):
   dispersion   >=0        cross-sectional std of 24h residual returns
   risk_on      in [0,1]   composite risk appetite used to scale net exposure
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -27,16 +28,17 @@ def _avg_pairwise_corr(r: pd.DataFrame, window: int) -> pd.Series:
     z = (r - mu) / sd
     n = z.notna().sum(axis=1)
     s = z.sum(axis=1, min_count=1)
-    var_s = (s ** 2).rolling(window, min_periods=window // 2).mean()
+    var_s = (s**2).rolling(window, min_periods=window // 2).mean()
     nbar = n.rolling(window, min_periods=1).mean()
     rho = (var_s - nbar) / (nbar * (nbar - 1)).clip(lower=1)
     return rho.clip(-1, 1)
 
 
-def regime_features(logp: pd.DataFrame, r: pd.DataFrame, rm: pd.Series, resid: pd.DataFrame,
-                    eligible: pd.DataFrame) -> pd.DataFrame:
+def regime_features(
+    logp: pd.DataFrame, r: pd.DataFrame, rm: pd.Series, resid: pd.DataFrame, eligible: pd.DataFrame
+) -> pd.DataFrame:
     idx = rm.fillna(0).cumsum()
-    vol_m = np.sqrt((rm ** 2).ewm(halflife=72, min_periods=48).mean())
+    vol_m = np.sqrt((rm**2).ewm(halflife=72, min_periods=48).mean())
     trend = 0.0
     for h in (72, 168, 336):
         trend = trend + np.tanh(((idx - idx.shift(h)) / (vol_m * np.sqrt(h))) / 1.5)
@@ -46,7 +48,7 @@ def regime_features(logp: pd.DataFrame, r: pd.DataFrame, rm: pd.Series, resid: p
     above = (logp > ema).where(eligible)
     breadth = above.mean(axis=1)
 
-    vol_short = np.sqrt((rm ** 2).ewm(halflife=12, min_periods=12).mean())
+    vol_short = np.sqrt((rm**2).ewm(halflife=12, min_periods=12).mean())
     vol_ratio = vol_short / vol_short.rolling(24 * 30, min_periods=24 * 7).median()
 
     avg_corr = _avg_pairwise_corr(r.where(eligible), 72)
@@ -56,5 +58,13 @@ def regime_features(logp: pd.DataFrame, r: pd.DataFrame, rm: pd.Series, resid: p
     raw = 0.5 * (trend + 1) * 0.6 + breadth.fillna(0.5) * 0.4
     stress = (1.0 / vol_ratio.clip(lower=1.0)).fillna(1.0) ** 0.5
     risk_on = (raw * stress).clip(0, 1)
-    return pd.DataFrame({"mkt_trend": trend, "breadth": breadth, "vol_ratio": vol_ratio,
-                         "avg_corr": avg_corr, "dispersion": dispersion, "risk_on": risk_on})
+    return pd.DataFrame(
+        {
+            "mkt_trend": trend,
+            "breadth": breadth,
+            "vol_ratio": vol_ratio,
+            "avg_corr": avg_corr,
+            "dispersion": dispersion,
+            "risk_on": risk_on,
+        }
+    )

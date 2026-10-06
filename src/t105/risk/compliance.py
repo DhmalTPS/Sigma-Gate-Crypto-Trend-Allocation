@@ -9,6 +9,7 @@ Rules enforced (competition.yaml):
   * no arbitrage: single venue, no simultaneous offsetting legs on related pairs
 Plus our own limits: max single-order size, and the circuit breakers.
 """
+
 from __future__ import annotations
 
 import time
@@ -19,13 +20,13 @@ from dataclasses import dataclass
 @dataclass
 class RiskLimits:
     max_gross: float = 1.0
-    max_order_frac: float = 0.25      # single order <= 25% of NAV
+    max_order_frac: float = 0.25  # single order <= 25% of NAV
     max_orders_per_cycle: int = 40
     max_orders_per_hour: int = 80
-    breaker_dd: float = 0.15          # drawdown from peak that triggers flatten + cooldown
+    breaker_dd: float = 0.15  # drawdown from peak that triggers flatten + cooldown
     breaker_cooldown_h: float = 12.0
-    stale_data_s: float = 3 * 3600    # never trade on market data older than this
-    max_api_failures: int = 8         # consecutive failures -> pause new risk
+    stale_data_s: float = 3 * 3600  # never trade on market data older than this
+    max_api_failures: int = 8  # consecutive failures -> pause new risk
 
 
 class Compliance:
@@ -41,9 +42,18 @@ class Compliance:
             self.sent.popleft()
         return len(self.sent) < self.L.max_orders_per_hour
 
-    def check(self, pair: str, side: str, usd: float, nav: float, gross_after: float,
-              resting_sides: dict[str, set], reduces_gap: bool, cycle_count: int,
-              risk_reducing: bool = False) -> tuple[bool, str]:
+    def check(
+        self,
+        pair: str,
+        side: str,
+        usd: float,
+        nav: float,
+        gross_after: float,
+        resting_sides: dict[str, set],
+        reduces_gap: bool,
+        cycle_count: int,
+        risk_reducing: bool = False,
+    ) -> tuple[bool, str]:
         why = None
         if pair not in self.universe:
             why = "pair not in researched universe"
@@ -60,8 +70,7 @@ class Compliance:
         elif side in ("BUY", "SELL") and ({"BUY", "SELL"} - {side}) & resting_sides.get(pair, set()):
             why = "opposite resting order on pair (would look like market making)"
         if why:
-            self.audit.write("compliance", {"pair": pair, "side": side, "usd": round(usd, 2),
-                                            "blocked": why})
+            self.audit.write("compliance", {"pair": pair, "side": side, "usd": round(usd, 2), "blocked": why})
             return False, why
         self.sent.append(time.time())
         return True, ""

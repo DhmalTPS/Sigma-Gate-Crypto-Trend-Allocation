@@ -17,6 +17,7 @@ enough. We also report:
   * Stationary block-bootstrap confidence intervals (Politis & Romano 1994),
     which respect volatility clustering / autocorrelation.
 """
+
 from __future__ import annotations
 
 import math
@@ -47,7 +48,7 @@ def sharpe(r: np.ndarray, ppy: float = HOURS_PER_YEAR) -> float:
 
 def sortino(r: np.ndarray, ppy: float = HOURS_PER_YEAR) -> float:
     r = np.asarray(r, float)
-    dd = np.sqrt(np.mean(np.minimum(r, 0.0) ** 2)) if len(r) else 0.0   # target = 0
+    dd = np.sqrt(np.mean(np.minimum(r, 0.0) ** 2)) if len(r) else 0.0  # target = 0
     return float(r.mean() / dd * math.sqrt(ppy)) if dd > 0 else 0.0
 
 
@@ -74,8 +75,8 @@ def probabilistic_sharpe(r: np.ndarray, sr_benchmark: float = 0.0) -> float:
         return 0.5
     sr = r.mean() / r.std(ddof=1)
     z = (r - r.mean()) / r.std(ddof=0)
-    skew, kurt = float(np.mean(z ** 3)), float(np.mean(z ** 4))
-    denom = math.sqrt(max(1e-12, 1 - skew * sr + (kurt - 1) / 4 * sr ** 2))
+    skew, kurt = float(np.mean(z**3)), float(np.mean(z**4))
+    denom = math.sqrt(max(1e-12, 1 - skew * sr + (kurt - 1) / 4 * sr**2))
     stat = (sr - sr_benchmark) * math.sqrt(n - 1) / denom
     return float(0.5 * (1 + math.erf(stat / math.sqrt(2))))
 
@@ -86,13 +87,12 @@ def deflated_sharpe_threshold(n_trials: int, sr_std_across_trials: float) -> flo
         return 0.0
     g = 0.5772156649
     from statistics import NormalDist
+
     nd = NormalDist()
-    return sr_std_across_trials * ((1 - g) * nd.inv_cdf(1 - 1 / n_trials)
-                                   + g * nd.inv_cdf(1 - 1 / (n_trials * math.e)))
+    return sr_std_across_trials * ((1 - g) * nd.inv_cdf(1 - 1 / n_trials) + g * nd.inv_cdf(1 - 1 / (n_trials * math.e)))
 
 
-def stationary_bootstrap(r: np.ndarray, stat, n_boot: int = 1000, mean_block: int = 24,
-                         seed: int = 7) -> np.ndarray:
+def stationary_bootstrap(r: np.ndarray, stat, n_boot: int = 1000, mean_block: int = 24, seed: int = 7) -> np.ndarray:
     """Politis-Romano stationary bootstrap of `stat(resampled_returns)`."""
     rng = np.random.default_rng(seed)
     r = np.asarray(r, float)
@@ -110,8 +110,9 @@ def stationary_bootstrap(r: np.ndarray, stat, n_boot: int = 1000, mean_block: in
     return out
 
 
-def summary(nav: pd.Series, ppy: float = HOURS_PER_YEAR, fees_paid: float = 0.0,
-            turnover: float = 0.0, n_trades: int = 0) -> dict:
+def summary(
+    nav: pd.Series, ppy: float = HOURS_PER_YEAR, fees_paid: float = 0.0, turnover: float = 0.0, n_trades: int = 0
+) -> dict:
     nav = nav.dropna()
     r = returns_from_nav(nav).values
     total = float(nav.iloc[-1] / nav.iloc[0] - 1) if len(nav) > 1 else 0.0
@@ -138,9 +139,17 @@ def rolling_window_stats(nav: pd.Series, window: int, step: int, ppy: float = HO
     rows = []
     v = nav.values
     for s in range(0, len(v) - window, step):
-        seg = v[s:s + window + 1]
+        seg = v[s : s + window + 1]
         r = np.diff(seg) / seg[:-1]
-        rows.append({"start": nav.index[s], "ret": seg[-1] / seg[0] - 1, "mdd": max_drawdown(seg),
-                     "sharpe": sharpe(r, ppy), "sortino": sortino(r, ppy),
-                     "calmar_raw": calmar(seg, ppy, False), "composite": composite(seg, ppy)})
+        rows.append(
+            {
+                "start": nav.index[s],
+                "ret": seg[-1] / seg[0] - 1,
+                "mdd": max_drawdown(seg),
+                "sharpe": sharpe(r, ppy),
+                "sortino": sortino(r, ppy),
+                "calmar_raw": calmar(seg, ppy, False),
+                "composite": composite(seg, ppy),
+            }
+        )
     return pd.DataFrame(rows)

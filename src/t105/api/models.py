@@ -1,4 +1,5 @@
 """Exchange metadata + order-validity helpers (never hard-code precision)."""
+
 from __future__ import annotations
 
 import math
@@ -12,7 +13,7 @@ class PairInfo:
     coin: str
     price_precision: int
     amount_precision: int
-    min_notional: float      # docs: OK if price*amount > MiniOrder
+    min_notional: float  # docs: OK if price*amount > MiniOrder
     can_trade: bool
 
     def floor_qty(self, qty: float) -> float:
@@ -25,7 +26,7 @@ class PairInfo:
     def round_price(self, px: float, side: str) -> float:
         """Round a limit price to the tick in the *passive* direction:
         buys round down, sells round up -- never accidentally cross."""
-        step = 10 ** -self.price_precision
+        step = 10**-self.price_precision
         f = math.floor if side == "BUY" else math.ceil
         return round(f(px / step + 1e-9 if side == "BUY" else px / step - 1e-9) * step, self.price_precision)
 
@@ -39,7 +40,12 @@ class PairInfo:
 def parse_exchange_info(data: dict) -> dict[str, PairInfo]:
     out = {}
     for pair, v in data.get("TradePairs", {}).items():
-        out[pair] = PairInfo(pair, v.get("Coin", pair.split("/")[0]), int(v["PricePrecision"]),
-                             int(v["AmountPrecision"]), float(v.get("MiniOrder", 1.0)),
-                             bool(v.get("CanTrade", False)))
+        out[pair] = PairInfo(
+            pair,
+            v.get("Coin", pair.split("/")[0]),
+            int(v["PricePrecision"]),
+            int(v["AmountPrecision"]),
+            float(v.get("MiniOrder", 1.0)),
+            bool(v.get("CanTrade", False)),
+        )
     return out

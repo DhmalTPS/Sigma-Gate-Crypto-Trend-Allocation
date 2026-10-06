@@ -4,6 +4,7 @@ Observed on a dev box: IPv6 resolves but is unroutable (WinError 10051), making
 every request hang through retries. IPv4-only is harmless on EC2. Disable with
 T105_ALLOW_IPV6=1.
 """
+
 import os
 import socket
 

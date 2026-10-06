@@ -7,6 +7,7 @@ Reported net at maker (5 bps) and taker (10 bps) costs, and split by sample halv
 
 usage: python research/reversal_economics.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -20,6 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "research"))
 
 from beta_research import simulate  # noqa: E402
+
 from t105.data.universe import load_panels, price_precisions  # noqa: E402
 from t105.strategy import signals as S  # noqa: E402
 from t105.strategy.core import tick_bps  # noqa: E402
@@ -41,7 +43,7 @@ def main() -> None:
     for L in (3, 6, 12, 24):
         z = resid.rolling(L).sum() / (vol * np.sqrt(L))
         z = z.where(elig)
-        rk = z.rank(axis=1)                     # most negative = rank 1 (most oversold)
+        rk = z.rank(axis=1)  # most negative = rank 1 (most oversold)
         for K in (5, 10):
             pick = (rk <= K).astype(float) / vol
             w = pick.div(pick.sum(axis=1).replace(0, np.nan), axis=0).fillna(0)
@@ -54,8 +56,19 @@ def main() -> None:
                     t = ex.mean() / ex.std() * np.sqrt(len(ex.dropna()))
                     h1, h2 = ex.loc[:mid].mean() * 8760, ex.loc[mid:].mean() * 8760
                     turn = (w.iloc[::H].diff().abs().sum(axis=1)).mean() * (8760 / H)
-                    rows.append({"L": L, "K": K, "H": H, "cost_bps": c * 1e4, "excess_ann": ann, "t": t,
-                                 "h1": h1, "h2": h2, "turn_per_yr": turn})
+                    rows.append(
+                        {
+                            "L": L,
+                            "K": K,
+                            "H": H,
+                            "cost_bps": c * 1e4,
+                            "excess_ann": ann,
+                            "t": t,
+                            "h1": h1,
+                            "h2": h2,
+                            "turn_per_yr": turn,
+                        }
+                    )
     df = pd.DataFrame(rows)
     pd.set_option("display.width", 200)
     print(df.round(3).to_string(index=False))

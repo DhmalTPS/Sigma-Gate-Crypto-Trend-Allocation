@@ -10,6 +10,7 @@ Timeline of one hour:
 Restart-safe: state.json only stores *policy memory* (peak NAV, hysteresis,
 maker attempts). Positions are always re-read from the exchange.
 """
+
 from __future__ import annotations
 
 import json
@@ -51,8 +52,16 @@ class ShadowBook:
         if self.last_px is not None and len(self.w):
             r = (px / self.last_px - 1).reindex(self.w.index).fillna(0)
             self.nav *= 1 + float((self.w * r).sum())
-        w_new, _ = target_weights(out.alpha.loc[t], out.vol.loc[t], out.regime.loc[t],
-                                  out.returns.tail(self.pol.cov_window), self.w, self.nav, self.st, self.pol)
+        w_new, _ = target_weights(
+            out.alpha.loc[t],
+            out.vol.loc[t],
+            out.regime.loc[t],
+            out.returns.tail(self.pol.cov_window),
+            self.w,
+            self.nav,
+            self.st,
+            self.pol,
+        )
         turn = float((w_new - self.w.reindex(w_new.index).fillna(0)).abs().sum())
         self.nav *= 1 - turn * self.cost
         self.w, self.last_px = w_new[w_new != 0], px
@@ -60,15 +69,18 @@ class ShadowBook:
 
 
 class Bot:
-    def __init__(self, root: Path, profile: str, dry_run: bool = False,
-                 strategy_file: str = "config/strategy.yaml"):
+    def __init__(self, root: Path, profile: str, dry_run: bool = False, strategy_file: str = "config/strategy.yaml"):
         self.root, self.profile, self.dry = root, profile, dry_run
         self.cfg = CFG.load(root, strategy_file)
         self.live_cfg = self.cfg["live"]
         self.audit = Audit(root / "logs" / profile)
         comp = self.cfg["competition"]
-        self.client = RoostooClient(load_credentials(profile, root), comp["api"]["base_url"],
-                                    comp["api"]["max_requests_per_minute"], audit=self.audit.api_sink())
+        self.client = RoostooClient(
+            load_credentials(profile, root),
+            comp["api"]["base_url"],
+            comp["api"]["max_requests_per_minute"],
+            audit=self.audit.api_sink(),
+        )
         self.state_path = root / "state" / f"{profile}_state.json"
         self.state = self._load_state()
         self.running = True
@@ -80,17 +92,17 @@ class Bot:
                 return json.loads(self.state_path.read_text())
             except json.JSONDecodeError:
                 log.error("corrupt state file; starting fresh policy memory")
-        return {"peak_nav": 0.0, "active": {}, "maker_attempts": {}, "breaker_until": 0.0,
-                "last_cycle_hour": None}
+        return {"peak_nav": 0.0, "active": {}, "maker_attempts": {}, "breaker_until": 0.0, "last_cycle_hour": None}
 
     def _save_state(self) -> None:
         tmp = self.state_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.state, indent=1, default=str))
-        os.replace(tmp, self.state_path)          # atomic on POSIX and Windows
+        os.replace(tmp, self.state_path)  # atomic on POSIX and Windows
 
     # ------------------------------------------------------------ setup
     def setup(self) -> None:
         from .market import LiveMarket
+
         self.client.sync_time()
         info = self.client.exchange_info()
         if not info.ok:
@@ -98,28 +110,45 @@ class Bot:
         self.pairs = parse_exchange_info(info.data)
         self.pp = price_precisions(info.data)
         whitelist = set(self.cfg["strategy"].universe)
-        self.universe = [p for p in crypto_pairs(info.data) if self.pairs[p].can_trade
-                         and (not whitelist or p in whitelist)]
+        self.universe = [
+            p for p in crypto_pairs(info.data) if self.pairs[p].can_trade and (not whitelist or p in whitelist)
+        ]
         missing = whitelist - set(self.universe)
         if missing:
             log.warning("configured pairs not tradeable on this account: %s", sorted(missing))
         self.broker = Broker(self.client, self.pairs, self.audit)
         self.comp = Compliance(self.cfg["risk"], set(self.universe), self.audit)
-        self.market = LiveMarket(self.client, self.universe, self.live_cfg.get("lookback_h", 24 * 60),
-                                 local_dir=self.root / "data" / "bootstrap")
+        self.market = LiveMarket(
+            self.client,
+            self.universe,
+            self.live_cfg.get("lookback_h", 24 * 60),
+            local_dir=self.root / "data" / "bootstrap",
+        )
         log.info("bootstrapping %d pairs of hourly history ...", len(self.universe))
         self.market.bootstrap()
         self.market.refresh_ticker()
         pol = self.cfg["policy"]
         from dataclasses import replace
+
         # Counterfactuals on the same signals: one per parameter we might be tempted to change.
-        self.shadows = [ShadowBook("no_shorts", replace(pol, mode="long_only")),
-                        ShadowBook("vol_target_20", replace(pol, target_vol_ann=0.20)),
-                        ShadowBook("vol_target_40", replace(pol, target_vol_ann=0.40))]
-        self.audit.write("health", {"event": "startup", "profile": self.profile, "dry_run": self.dry,
-                                    "version": self.cfg["version"], "universe": len(self.universe),
-                                    "bars_loaded": len(self.market.bars), "bar_sources": self.market.sources,
-                                    "clock_offset_ms": self.client.offset_ms})
+        self.shadows = [
+            ShadowBook("no_shorts", replace(pol, mode="long_only")),
+            ShadowBook("vol_target_20", replace(pol, target_vol_ann=0.20)),
+            ShadowBook("vol_target_40", replace(pol, target_vol_ann=0.40)),
+        ]
+        self.audit.write(
+            "health",
+            {
+                "event": "startup",
+                "profile": self.profile,
+                "dry_run": self.dry,
+                "version": self.cfg["version"],
+                "universe": len(self.universe),
+                "bars_loaded": len(self.market.bars),
+                "bar_sources": self.market.sources,
+                "clock_offset_ms": self.client.offset_ms,
+            },
+        )
 
     # ------------------------------------------------------------ helpers
     def _nav(self, bk: Book) -> float:
@@ -130,8 +159,11 @@ class Bot:
         if not r.ok:
             return -1
         day0 = int(datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
-        return sum(1 for o in r.data.get("OrderMatched", [])
-                   if o.get("Status") == "FILLED" and int(o.get("FinishTimestamp", 0) or 0) >= day0)
+        return sum(
+            1
+            for o in r.data.get("OrderMatched", [])
+            if o.get("Status") == "FILLED" and int(o.get("FinishTimestamp", 0) or 0) >= day0
+        )
 
     # ------------------------------------------------------------ the hourly cycle
     def cycle(self) -> None:
@@ -178,15 +210,27 @@ class Bot:
         # 5) policy
         cur_val = bk.signed_values(mids)
         cur_w = pd.Series(cur_val, dtype=float) / nav if nav > 0 else pd.Series(dtype=float)
-        st = PolicyState(peak_nav=self.state["peak_nav"], active=self.state.get("active", {}),
-                         nav_hist=self.state.get("nav_hist", []))
+        st = PolicyState(
+            peak_nav=self.state["peak_nav"],
+            active=self.state.get("active", {}),
+            nav_hist=self.state.get("nav_hist", []),
+        )
         breaker = time.time() < self.state.get("breaker_until", 0)
         if 1 - nav / self.state["peak_nav"] >= L.breaker_dd and not breaker:
             self.state["breaker_until"] = time.time() + L.breaker_cooldown_h * 3600
             breaker = True
             self.audit.write("health", {"event": "circuit_breaker", "nav": nav, "peak": self.state["peak_nav"]})
-        w, diag = target_weights(alpha, out.vol.loc[t], out.regime.loc[t], out.returns.tail(pol.cov_window),
-                                 cur_w, nav, st, pol, shorts_enabled=self.broker.shorts_supported)
+        w, diag = target_weights(
+            alpha,
+            out.vol.loc[t],
+            out.regime.loc[t],
+            out.returns.tail(pol.cov_window),
+            cur_w,
+            nav,
+            st,
+            pol,
+            shorts_enabled=self.broker.shorts_supported,
+        )
         if breaker:
             w = w * 0.0
         self.state["active"] = st.active
@@ -211,15 +255,27 @@ class Bot:
         px = P["close"].loc[t]
         shadow = [s.step(out, px, t) for s in self.shadows]
         top = alpha.dropna().sort_values()
-        self.audit.write("decision", {
-            "bar": t, "nav": round(nav, 2), "peak": round(self.state["peak_nav"], 2),
-            "diag": diag, "breaker": breaker, "sleeve_w": out.sleeve_weights.loc[t].round(3).to_dict(),
-            "regime": out.regime.loc[t].round(4).to_dict(),
-            "alpha_top": top.tail(5).round(3).to_dict(), "alpha_bottom": top.head(5).round(3).to_dict(),
-            "target_w": {k: round(v, 4) for k, v in w[w != 0].items()},
-            "current_w": {k: round(v, 4) for k, v in cur_w[cur_w.abs() > 1e-4].items()},
-            "orders": orders, "shadows": shadow, "elapsed_s": round(time.time() - t0, 1),
-            "binance_ok": self.market.binance_ok, "version": self.cfg["version"]})
+        self.audit.write(
+            "decision",
+            {
+                "bar": t,
+                "nav": round(nav, 2),
+                "peak": round(self.state["peak_nav"], 2),
+                "diag": diag,
+                "breaker": breaker,
+                "sleeve_w": out.sleeve_weights.loc[t].round(3).to_dict(),
+                "regime": out.regime.loc[t].round(4).to_dict(),
+                "alpha_top": top.tail(5).round(3).to_dict(),
+                "alpha_bottom": top.head(5).round(3).to_dict(),
+                "target_w": {k: round(v, 4) for k, v in w[w != 0].items()},
+                "current_w": {k: round(v, 4) for k, v in cur_w[cur_w.abs() > 1e-4].items()},
+                "orders": orders,
+                "shadows": shadow,
+                "elapsed_s": round(time.time() - t0, 1),
+                "binance_ok": self.market.binance_ok,
+                "version": self.cfg["version"],
+            },
+        )
         self.state["last_cycle_hour"] = str(pd.Timestamp.now(tz="UTC").floor("h"))
         self._save_state()
 
@@ -233,6 +289,7 @@ class Bot:
         """
         import copy
         from dataclasses import replace as dc_replace
+
         hour = datetime.now(timezone.utc).hour
         if hour < self.live_cfg.get("activity_guard_hour_utc", 12):
             return []
@@ -241,11 +298,19 @@ class Bot:
         if filled < 0 or filled >= need:
             return []
         raw_pol = dc_replace(pol, band_abs=0.0, band_rel=0.0, min_trade_usd=0.0)
-        w_raw, _ = target_weights(alpha, out.vol.loc[t], out.regime.loc[t], out.returns.tail(pol.cov_window),
-                                  cur_w, nav, copy.deepcopy(st), raw_pol,
-                                  shorts_enabled=self.broker.shorts_supported)
+        w_raw, _ = target_weights(
+            alpha,
+            out.vol.loc[t],
+            out.regime.loc[t],
+            out.returns.tail(pol.cov_window),
+            cur_w,
+            nav,
+            copy.deepcopy(st),
+            raw_pol,
+            shorts_enabled=self.broker.shorts_supported,
+        )
         idx = cur_w.index.union(w_raw.index)
-        gap = (w_raw.reindex(idx).fillna(0) - cur_w.reindex(idx).fillna(0))
+        gap = w_raw.reindex(idx).fillna(0) - cur_w.reindex(idx).fillna(0)
         gap = gap[[p for p in gap.index if p in self.pairs and p in mids]]
         if len(gap) == 0:
             return []
@@ -261,12 +326,24 @@ class Bot:
             step = -float(np.sign(held[j])) * lo
         wg = cur_w.copy()
         wg[j] = cur_w.get(j, 0.0) + step
-        self.audit.write("health", {"event": "activity_guard", "fills_today": filled, "need": need,
-                                    "pair": j, "step_w": round(step, 4)})
+        self.audit.write(
+            "health",
+            {"event": "activity_guard", "fills_today": filled, "need": need, "pair": j, "step_w": round(step, 4)},
+        )
         return self._execute(wg, cur_w, bk, nav, mids, ex, urgent=True, only=[j], reason="activity_guard")
 
-    def _execute(self, w: pd.Series, cur_w: pd.Series, bk: Book, nav: float, mids: dict,
-                 ex, urgent: bool, only: list | None = None, reason: str = "rebalance") -> list:
+    def _execute(
+        self,
+        w: pd.Series,
+        cur_w: pd.Series,
+        bk: Book,
+        nav: float,
+        mids: dict,
+        ex,
+        urgent: bool,
+        only: list | None = None,
+        reason: str = "rebalance",
+    ) -> list:
         names = sorted(set(w.index) | set(cur_w.index))
         if only is not None:
             names = only
@@ -310,21 +387,39 @@ class Bot:
                     legs.append(("short_close", -d / px))
             for kind, amt in legs:
                 usd = amt if kind == "short_open" else amt * px
-                if usd < self.cfg["policy"].min_trade_usd and not (kind == "SELL" and tw == 0) and \
-                        not (kind == "short_close" and tw >= 0):
+                if (
+                    usd < self.cfg["policy"].min_trade_usd
+                    and not (kind == "SELL" and tw == 0)
+                    and not (kind == "short_close" and tw >= 0)
+                ):
                     continue
                 reducing = kind in ("SELL", "short_close")
                 cap = self.cfg["risk"].max_order_frac * nav
-                if not reducing and usd > cap:      # slice: the next cycle completes the rest
+                if not reducing and usd > cap:  # slice: the next cycle completes the rest
                     amt, usd = amt * cap / usd, cap
                 gross_after = gross + (-usd if reducing else usd) / nav
-                ok, why = self.comp.check(p, kind if kind in ("BUY", "SELL") else "SHORT", usd, nav,
-                                          gross_after, {}, True, n, risk_reducing=reducing)
+                ok, why = self.comp.check(
+                    p,
+                    kind if kind in ("BUY", "SELL") else "SHORT",
+                    usd,
+                    nav,
+                    gross_after,
+                    {},
+                    True,
+                    n,
+                    risk_reducing=reducing,
+                )
                 if not ok:
                     continue
                 n += 1
-                rec = {"pair": p, "kind": kind, "usd": round(usd, 2), "target_w": round(tw, 4),
-                       "current_w": round(cw, 4), "reason": reason}
+                rec = {
+                    "pair": p,
+                    "kind": kind,
+                    "usd": round(usd, 2),
+                    "target_w": round(tw, 4),
+                    "current_w": round(cw, 4),
+                    "reason": reason,
+                }
                 if self.dry:
                     rec["dry_run"] = True
                     sent.append(rec)
@@ -336,11 +431,17 @@ class Bot:
                         qty = min(amt, max(0.0, usd_free * 0.995) / (top[1] * (1 + ex.taker_fee)))
                     else:
                         qty = amt
-                    price = top[0] if kind == "BUY" else top[1]      # join the passive side
-                    o = self.broker.spot(p, kind, qty, "LIMIT" if use_limit else "MARKET",
-                                         price if use_limit else None, reason)
-                    rec.update({"type": "LIMIT" if use_limit else "MARKET",
-                                "status": (o or {}).get("Status"), "order_id": (o or {}).get("OrderID")})
+                    price = top[0] if kind == "BUY" else top[1]  # join the passive side
+                    o = self.broker.spot(
+                        p, kind, qty, "LIMIT" if use_limit else "MARKET", price if use_limit else None, reason
+                    )
+                    rec.update(
+                        {
+                            "type": "LIMIT" if use_limit else "MARKET",
+                            "status": (o or {}).get("Status"),
+                            "order_id": (o or {}).get("OrderID"),
+                        }
+                    )
                     if o and kind == "BUY":
                         usd_free -= qty * price * (1 + ex.taker_fee)
                     if o and not use_limit:
@@ -368,10 +469,19 @@ class Bot:
         nav = self._nav(bk)
         peak = max(self.state.get("peak_nav", 0.0), nav)
         self.state["peak_nav"] = peak
-        self.audit.write("nav", {"nav": round(nav, 2), "peak": round(peak, 2), "dd": round(1 - nav / peak, 5),
-                                 "usd_free": round(bk.usd_free, 2), "usd_lock": round(bk.usd_lock, 2),
-                                 "n_long": len(bk.coins), "n_short": len(bk.shorts),
-                                 "api_fail_streak": self.client.consecutive_failures})
+        self.audit.write(
+            "nav",
+            {
+                "nav": round(nav, 2),
+                "peak": round(peak, 2),
+                "dd": round(1 - nav / peak, 5),
+                "usd_free": round(bk.usd_free, 2),
+                "usd_lock": round(bk.usd_lock, 2),
+                "n_long": len(bk.coins),
+                "n_short": len(bk.shorts),
+                "api_fail_streak": self.client.consecutive_failures,
+            },
+        )
         L = self.cfg["risk"]
         if 1 - nav / peak >= L.breaker_dd and time.time() >= self.state.get("breaker_until", 0):
             log.warning("intra-hour circuit breaker at NAV %.0f (peak %.0f)", nav, peak)
@@ -406,7 +516,8 @@ class Bot:
             fn()
         except Exception as e:  # noqa: BLE001 -- the loop must survive any single failure
             log.exception("error in %s", getattr(fn, "__name__", fn))
-            self.audit.write("health", {"event": "exception", "where": getattr(fn, "__name__", "?"),
-                                        "error": repr(e)[:500]})
+            self.audit.write(
+                "health", {"event": "exception", "where": getattr(fn, "__name__", "?"), "error": repr(e)[:500]}
+            )
             # make sure a failing cycle does not hot-loop: mark the hour as attempted
             self.state["last_cycle_hour"] = str(pd.Timestamp.now(tz="UTC").floor("h"))

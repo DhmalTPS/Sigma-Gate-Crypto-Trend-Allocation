@@ -15,6 +15,7 @@ it models, deliberately conservatively:
     which is equivalent to Roostoo's collateral mechanics.
   * Decisions at bar t use information up to the close of t only.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -33,9 +34,9 @@ class ExecParams:
     short_fee: float = 0.0010
     touch_bps: float = 2.0
     slippage_bps: float = 1.0
-    maker_patience: int = 1     # hours a limit may rest before crossing
+    maker_patience: int = 1  # hours a limit may rest before crossing
     use_maker: bool = True
-    decision_every: int = 1     # hours between strategy decisions
+    decision_every: int = 1  # hours between strategy decisions
 
 
 @dataclass
@@ -50,10 +51,18 @@ class BacktestResult:
     meta: dict = field(default_factory=dict)
 
 
-def run(out: StrategyOutput, close: pd.DataFrame, high: pd.DataFrame, low: pd.DataFrame,
-        pol: PolicyParams, ex: ExecParams, initial: float = 100_000.0,
-        start: pd.Timestamp | None = None, end: pd.Timestamp | None = None,
-        half_spread_bps: pd.Series | None = None) -> BacktestResult:
+def run(
+    out: StrategyOutput,
+    close: pd.DataFrame,
+    high: pd.DataFrame,
+    low: pd.DataFrame,
+    pol: PolicyParams,
+    ex: ExecParams,
+    initial: float = 100_000.0,
+    start: pd.Timestamp | None = None,
+    end: pd.Timestamp | None = None,
+    half_spread_bps: pd.Series | None = None,
+) -> BacktestResult:
     idx = close.index
     if start is not None:
         idx = idx[idx >= start]
@@ -63,20 +72,18 @@ def run(out: StrategyOutput, close: pd.DataFrame, high: pd.DataFrame, low: pd.Da
     C = close.reindex(idx)[cols].values
     Hh = high.reindex(idx)[cols].values
     Ll = low.reindex(idx)[cols].values
-    hs = (half_spread_bps.reindex(cols).fillna(1.0).values if half_spread_bps is not None
-          else np.ones(len(cols))) / 1e4
+    hs = (half_spread_bps.reindex(cols).fillna(1.0).values if half_spread_bps is not None else np.ones(len(cols))) / 1e4
     slip = ex.slippage_bps / 1e4
     touch = ex.touch_bps / 1e4
 
     qty = np.zeros(len(cols))
     cash = initial
     st = PolicyState(peak_nav=initial)
-    pending = {}     # j -> dict(qty, limit, age)
+    pending = {}  # j -> dict(qty, limit, age)
     navs, wrows, diags, trades = [], [], [], []
     fees = turnover = maker_notional = taker_notional = 0.0
 
     alpha, vol, regime, rets = out.alpha, out.vol, out.regime, out.returns
-    pos_of = {c: j for j, c in enumerate(cols)}
 
     for ti, t in enumerate(idx):
         px = C[ti]
@@ -86,8 +93,9 @@ def run(out: StrategyOutput, close: pd.DataFrame, high: pd.DataFrame, low: pd.Da
             o = pending[j]
             if not valid[j]:
                 continue
-            filled = (o["qty"] > 0 and Ll[ti, j] <= o["limit"] * (1 - touch)) or \
-                     (o["qty"] < 0 and Hh[ti, j] >= o["limit"] * (1 + touch))
+            filled = (o["qty"] > 0 and Ll[ti, j] <= o["limit"] * (1 - touch)) or (
+                o["qty"] < 0 and Hh[ti, j] >= o["limit"] * (1 + touch)
+            )
             if filled:
                 notional = abs(o["qty"]) * o["limit"]
                 cash -= o["qty"] * o["limit"] + notional * ex.maker_fee
@@ -111,8 +119,9 @@ def run(out: StrategyOutput, close: pd.DataFrame, high: pd.DataFrame, low: pd.Da
         a_row = alpha.loc[t].reindex(cols) if t in alpha.index else pd.Series(np.nan, index=cols)
         # never open into an asset with no price this bar
         a_row[~valid] = np.nan
-        w_t, d = target_weights(a_row, vol.loc[t].reindex(cols), regime.loc[t],
-                                rets.loc[:t].tail(pol.cov_window), cur_w, nav, st, pol)
+        w_t, d = target_weights(
+            a_row, vol.loc[t].reindex(cols), regime.loc[t], rets.loc[:t].tail(pol.cov_window), cur_w, nav, st, pol
+        )
         d["t"] = t
         diags.append(d)
         w_t = w_t.reindex(cols).fillna(0.0).values
@@ -155,5 +164,4 @@ def run(out: StrategyOutput, close: pd.DataFrame, high: pd.DataFrame, low: pd.Da
     T = pd.DataFrame(trades, columns=["t", "pair", "qty", "price", "liquidity"])
     D = pd.DataFrame(diags).set_index("t") if diags else pd.DataFrame()
     tot = maker_notional + taker_notional
-    return BacktestResult(nav_s, W, T, D, fees, turnover / initial,
-                          maker_notional / tot if tot else 0.0)
+    return BacktestResult(nav_s, W, T, D, fees, turnover / initial, maker_notional / tot if tot else 0.0)

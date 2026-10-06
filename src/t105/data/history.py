@@ -5,6 +5,7 @@ Roostoo vs BTCUSDT on Binance differ by ~1bp), so Binance klines are a
 faithful research proxy and a warm-start source for the live bot. The
 organizer explicitly allows external data sources.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,8 +19,20 @@ import requests
 log = logging.getLogger(__name__)
 
 BINANCE_URL = "https://data-api.binance.vision/api/v3/klines"
-_COLS = ["open_time", "open", "high", "low", "close", "volume", "close_time",
-         "quote_volume", "trades", "taker_base", "taker_quote", "ignore"]
+_COLS = [
+    "open_time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "close_time",
+    "quote_volume",
+    "trades",
+    "taker_base",
+    "taker_quote",
+    "ignore",
+]
 _INTERVAL_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}
 
 
@@ -28,9 +41,14 @@ def binance_symbol(roostoo_pair: str) -> str:
     return roostoo_pair.split("/")[0] + "USDT"
 
 
-def fetch_klines(symbol: str, interval: str = "1h", start_ms: int | None = None,
-                 end_ms: int | None = None, session: requests.Session | None = None,
-                 limit: int = 1000) -> pd.DataFrame:
+def fetch_klines(
+    symbol: str,
+    interval: str = "1h",
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+    session: requests.Session | None = None,
+    limit: int = 1000,
+) -> pd.DataFrame:
     """Page through klines in [start_ms, end_ms). Returns UTC-indexed frame."""
     s = session or requests.Session()
     step = _INTERVAL_MS[interval]
@@ -39,12 +57,11 @@ def fetch_klines(symbol: str, interval: str = "1h", start_ms: int | None = None,
     rows: list[list] = []
     cursor = start_ms
     while cursor < end_ms:
-        params = {"symbol": symbol, "interval": interval, "startTime": cursor,
-                  "endTime": end_ms - 1, "limit": limit}
+        params = {"symbol": symbol, "interval": interval, "startTime": cursor, "endTime": end_ms - 1, "limit": limit}
         for attempt in range(4):
             try:
                 r = s.get(BINANCE_URL, params=params, timeout=15)
-                if r.status_code == 400:      # unknown symbol
+                if r.status_code == 400:  # unknown symbol
                     return pd.DataFrame()
                 r.raise_for_status()
                 batch = r.json()
@@ -93,15 +110,18 @@ def fetch_klines_okx(roostoo_pair: str, hours: int, session: requests.Session | 
         after = data[-1][0]
     if not rows:
         return pd.DataFrame()
-    df = pd.DataFrame(rows, columns=["ts", "open", "high", "low", "close", "volume", "vol_ccy", "quote_volume",
-                                     "confirm"])
+    df = pd.DataFrame(
+        rows, columns=["ts", "open", "high", "low", "close", "volume", "vol_ccy", "quote_volume", "confirm"]
+    )
     df = df[df["confirm"] == "1"]
     df.index = pd.to_datetime(df["ts"].astype("int64"), unit="ms", utc=True)
     df = df[["open", "high", "low", "close", "volume", "quote_volume"]].astype(float)
     return df[~df.index.duplicated()].sort_index()
 
 
-def fetch_with_fallback(roostoo_pair: str, start_ms: int, end_ms: int, local_dir: Path | None = None) -> tuple[pd.DataFrame, str]:
+def fetch_with_fallback(
+    roostoo_pair: str, start_ms: int, end_ms: int, local_dir: Path | None = None
+) -> tuple[pd.DataFrame, str]:
     """Binance -> OKX -> bundled local snapshot. Returns (bars, source)."""
     try:
         df = fetch_klines(binance_symbol(roostoo_pair), "1h", start_ms, end_ms)
@@ -124,8 +144,9 @@ def fetch_with_fallback(roostoo_pair: str, start_ms: int, end_ms: int, local_dir
     return pd.DataFrame(), "none"
 
 
-def load_universe_history(pairs: list[str], interval: str, days: int, cache_dir: Path,
-                          refresh: bool = False) -> dict[str, pd.DataFrame]:
+def load_universe_history(
+    pairs: list[str], interval: str, days: int, cache_dir: Path, refresh: bool = False
+) -> dict[str, pd.DataFrame]:
     """Download (or load cached) history for each Roostoo pair."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     end_ms = int(time.time() * 1000)

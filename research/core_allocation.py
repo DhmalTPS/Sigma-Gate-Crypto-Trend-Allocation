@@ -8,6 +8,7 @@ Reported on full sample and on each half (robustness), plus 14-day window distri
 
 usage: python research/core_allocation.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -21,6 +22,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "research"))
 
 from beta_research import simulate, stats  # noqa: E402
+
 from t105.data.universe import load_panels  # noqa: E402
 
 MAJORS = ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD"]
@@ -31,7 +33,7 @@ def main() -> None:
     close = P["close"][MAJORS]
     lr = np.log(close).diff()
     r = close.pct_change(fill_method=None)
-    vol = np.sqrt((lr ** 2).ewm(halflife=72, min_periods=48).mean())
+    vol = np.sqrt((lr**2).ewm(halflife=72, min_periods=48).mean())
     start = close.index[24 * 60]
     mid = close.index[(len(close) + 24 * 60) // 2]
     inv = (1 / vol).div((1 / vol).sum(axis=1), axis=0)
@@ -57,8 +59,26 @@ def main() -> None:
                 rows.append(s)
     df = pd.DataFrame(rows)
     pd.set_option("display.width", 250)
-    print(df[["variant", "ret", "vol", "sharpe", "mdd", "calmar_raw", "psr", "w_med_ret", "w_p_pos", "w_q10",
-              "w_med_mdd", "w_q90_mdd"]].round(3).to_string(index=False))
+    print(
+        df[
+            [
+                "variant",
+                "ret",
+                "vol",
+                "sharpe",
+                "mdd",
+                "calmar_raw",
+                "psr",
+                "w_med_ret",
+                "w_p_pos",
+                "w_q10",
+                "w_med_mdd",
+                "w_q90_mdd",
+            ]
+        ]
+        .round(3)
+        .to_string(index=False)
+    )
     df.to_csv(ROOT / "reports" / "backtest" / "core_allocation.csv", index=False)
 
 

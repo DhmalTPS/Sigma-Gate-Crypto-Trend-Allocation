@@ -5,6 +5,7 @@ nav, health. Together they let anyone reconstruct
 data -> signal -> target -> order -> fill -> NAV, which is exactly what the
 "Trade Log Integrity" screen asks us to demonstrate.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,8 +24,12 @@ class Audit:
 
     def write(self, stream: str, rec: dict) -> None:
         now = datetime.now(timezone.utc)
-        rec = {"ts": now.isoformat(timespec="milliseconds"), "epoch_ms": int(time.time() * 1000),
-               "run": self.run_id, **rec}
+        rec = {
+            "ts": now.isoformat(timespec="milliseconds"),
+            "epoch_ms": int(time.time() * 1000),
+            "run": self.run_id,
+            **rec,
+        }
         day = self.root / now.strftime("%Y-%m-%d")
         day.mkdir(exist_ok=True)
         line = json.dumps(rec, default=str, separators=(",", ":"))

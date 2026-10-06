@@ -9,6 +9,7 @@ alpha row (+ regime, vol, covariance, current weights, NAV path)
   -> drawdown governor           (Calmar = return / MaxDD: protect the path)
   -> no-trade band               (only trade when the change is worth the fee)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,35 +20,35 @@ import pandas as pd
 
 @dataclass
 class PolicyParams:
-    mode: str = "long_only"      # long_only | long_short | neutral
-    sizing: str = "normalize"    # normalize: scale book to gross budget | absolute: alpha x inverse-vol basket
-    use_regime_gross: bool = False    # research: trend-timing of gross exposure did NOT help
-    enter: float = 0.30          # |alpha| to open a position
-    exit: float = 0.10           # |alpha| below which an open position is closed
+    mode: str = "long_only"  # long_only | long_short | neutral
+    sizing: str = "normalize"  # normalize: scale book to gross budget | absolute: alpha x inverse-vol basket
+    use_regime_gross: bool = False  # research: trend-timing of gross exposure did NOT help
+    enter: float = 0.30  # |alpha| to open a position
+    exit: float = 0.10  # |alpha| below which an open position is closed
     allow_short: bool = True
-    short_regime_max: float = -0.25   # shorts only when market trend below this
-    short_scale: float = 0.5     # shorts are sized smaller (fee 0.1% both legs + squeeze risk)
+    short_regime_max: float = -0.25  # shorts only when market trend below this
+    short_scale: float = 0.5  # shorts are sized smaller (fee 0.1% both legs + squeeze risk)
     target_vol_ann: float = 0.30
-    max_gross: float = 0.95      # <= 1.0 by rule; keep 5% cash buffer for fees/rounding
+    max_gross: float = 0.95  # <= 1.0 by rule; keep 5% cash buffer for fees/rounding
     max_weight: float = 0.20
     max_weight_major: float = 0.35
     majors: tuple = ("BTC/USD", "ETH/USD")
-    min_risk_on_gross: float = 0.15   # floor on gross budget even in risk-off
+    min_risk_on_gross: float = 0.15  # floor on gross budget even in risk-off
     cov_window: int = 24 * 14
-    cov_shrink: float = 0.3      # shrink correlation matrix toward constant-correlation
-    dd_soft: float = 0.03        # start de-risking at 3% drawdown from peak
-    dd_hard: float = 0.10        # minimum exposure reached at 10%
+    cov_shrink: float = 0.3  # shrink correlation matrix toward constant-correlation
+    dd_soft: float = 0.03  # start de-risking at 3% drawdown from peak
+    dd_hard: float = 0.10  # minimum exposure reached at 10%
     dd_floor: float = 0.25
     dd_peak_window_h: int = 336  # drawdown measured from the rolling 14-day peak (= contest length)
-    band_abs: float = 0.02       # do not trade a name unless |dw| > 2% NAV ...
-    band_rel: float = 0.25       # ... or > 25% of its target
+    band_abs: float = 0.02  # do not trade a name unless |dw| > 2% NAV ...
+    band_rel: float = 0.25  # ... or > 25% of its target
     min_trade_usd: float = 50.0
 
 
 @dataclass
 class PolicyState:
     peak_nav: float = 0.0
-    active: dict = field(default_factory=dict)   # pair -> +1 / -1 for open positions (hysteresis)
+    active: dict = field(default_factory=dict)  # pair -> +1 / -1 for open positions (hysteresis)
     nav_hist: list = field(default_factory=list)  # recent decision-time NAVs for the rolling peak
 
     def update_peak(self, nav: float, window: int) -> float:
@@ -86,9 +87,17 @@ def drawdown_multiplier(nav: float, peak: float, p: PolicyParams) -> float:
     return 1.0 - frac * (1.0 - p.dd_floor)
 
 
-def target_weights(alpha: pd.Series, vol: pd.Series, regime: pd.Series, recent_returns: pd.DataFrame,
-                   current_w: pd.Series, nav: float, st: PolicyState, p: PolicyParams,
-                   shorts_enabled: bool = True) -> tuple[pd.Series, dict]:
+def target_weights(
+    alpha: pd.Series,
+    vol: pd.Series,
+    regime: pd.Series,
+    recent_returns: pd.DataFrame,
+    current_w: pd.Series,
+    nav: float,
+    st: PolicyState,
+    p: PolicyParams,
+    shorts_enabled: bool = True,
+) -> tuple[pd.Series, dict]:
     """Return (final target weights, diagnostics). Weights are signed fractions of NAV."""
     st.update_peak(nav, p.dd_peak_window_h)
     a = alpha.dropna()
@@ -122,7 +131,7 @@ def target_weights(alpha: pd.Series, vol: pd.Series, regime: pd.Series, recent_r
     if p.sizing == "absolute":
         return _absolute(s, alpha, vol, recent_returns, current_w, nav, st, p, risk_on, trend, can_short)
     v = vol.reindex(s.index).replace(0, np.nan).fillna(vol.median())
-    raw = s / (v * np.sqrt(24))              # risk-budget: alpha per unit of daily vol
+    raw = s / (v * np.sqrt(24))  # risk-budget: alpha per unit of daily vol
     raw[raw < 0] *= p.short_scale
 
     # 2) gross budget (optionally regime-scaled) and side construction
@@ -159,9 +168,16 @@ def target_weights(alpha: pd.Series, vol: pd.Series, regime: pd.Series, recent_r
     raw = raw * m
 
     w = raw.reindex(current_w.index.union(raw.index).union(alpha.index)).fillna(0.0)
-    diag = {"gross": float(w.abs().sum()), "net": float(w.sum()), "risk_on": risk_on,
-            "mkt_trend": trend, "dd_mult": m, "ex_ante_vol": port_vol, "n": int((w != 0).sum()),
-            "can_short": can_short}
+    diag = {
+        "gross": float(w.abs().sum()),
+        "net": float(w.sum()),
+        "risk_on": risk_on,
+        "mkt_trend": trend,
+        "dd_mult": m,
+        "ex_ante_vol": port_vol,
+        "n": int((w != 0).sum()),
+        "can_short": can_short,
+    }
     return _band(w, current_w, nav, p), diag
 
 
@@ -191,9 +207,17 @@ def _absolute(s, alpha, vol, recent_returns, current_w, nav, st, p, risk_on, tre
     m = drawdown_multiplier(nav, st.peak_nav, p)
     raw = raw * m
     w = raw.reindex(current_w.index.union(raw.index).union(alpha.index)).fillna(0.0)
-    diag = {"gross": float(w.abs().sum()), "net": float(w.sum()), "risk_on": risk_on, "mkt_trend": trend,
-            "dd_mult": m, "basket_vol": port_vol, "vol_scale": scale, "n": int((w != 0).sum()),
-            "can_short": can_short}
+    diag = {
+        "gross": float(w.abs().sum()),
+        "net": float(w.sum()),
+        "risk_on": risk_on,
+        "mkt_trend": trend,
+        "dd_mult": m,
+        "basket_vol": port_vol,
+        "vol_scale": scale,
+        "n": int((w != 0).sum()),
+        "can_short": can_short,
+    }
     return _band(w, current_w, nav, p), diag
 
 

@@ -7,6 +7,7 @@ competition account must only ever be touched by the autonomous bot.
 
 usage: python scripts/smoke_test.py [--order-cycle] [--market]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,52 +35,74 @@ def main() -> None:
     ap.add_argument("--pair", default="BTC/USD")
     a = ap.parse_args()
 
-    creds = load_credentials("testing", ROOT)          # hard-wired: never deployment
+    creds = load_credentials("testing", ROOT)  # hard-wired: never deployment
     audit = Audit(ROOT / "logs" / "smoke")
     c = RoostooClient(creds, audit=audit.api_sink())
     print("credentials:", creds.fingerprint())
     print("clock offset ms:", c.sync_time())
 
-    r = c.exchange_info(); show("exchangeInfo", r)
+    r = c.exchange_info()
+    show("exchangeInfo", r)
     info = parse_exchange_info(r.data)
-    r = c.ticker(a.pair); show("ticker", r)
+    r = c.ticker(a.pair)
+    show("ticker", r)
     tk = r.data.get("Data", {}).get(a.pair, {})
     print("   ", tk)
-    r = c.balance(); show("balance", r)
-    wallet = {k: v for k, v in r.data.get("Wallet", r.data.get("SpotWallet", {})).items()
-              if v.get("Free", 0) or v.get("Lock", 0)} if r.ok else r.data
+    r = c.balance()
+    show("balance", r)
+    wallet = (
+        {
+            k: v
+            for k, v in r.data.get("Wallet", r.data.get("SpotWallet", {})).items()
+            if v.get("Free", 0) or v.get("Lock", 0)
+        }
+        if r.ok
+        else r.data
+    )
     print("    non-zero wallet:", json.dumps(wallet)[:400])
     if r.ok and "Wallet" not in r.data:
         print("    balance keys:", list(r.data.keys()))
-    r = c.pending_count(); show("pending_count", r); print("   ", r.data)
-    r = c.query_order(limit=5); show("query_order", r)
+    r = c.pending_count()
+    show("pending_count", r)
+    print("   ", r.data)
+    r = c.query_order(limit=5)
+    show("query_order", r)
     print("    last orders:", len(r.data.get("OrderMatched", [])))
-    r = c.short_positions(); show("short_positions", r); print("   ", str(r.data)[:300])
+    r = c.short_positions()
+    show("short_positions", r)
+    print("   ", str(r.data)[:300])
 
     if not a.order_cycle:
         return
     pi = info[a.pair]
     bid = float(tk["MaxBid"])
-    px = pi.round_price(bid * 0.80, "BUY")                 # 20% below: will not fill
-    qty = pi.floor_qty(max(15.0 / px, 10 ** -pi.amount_precision))
+    px = pi.round_price(bid * 0.80, "BUY")  # 20% below: will not fill
+    qty = pi.floor_qty(max(15.0 / px, 10**-pi.amount_precision))
     print(f"\n-- limit lifecycle: BUY {pi.fmt_qty(qty)} {a.pair} @ {pi.fmt_price(px)}")
-    r = c.place_order(a.pair, "BUY", pi.fmt_qty(qty), "LIMIT", pi.fmt_price(px)); show("place LIMIT", r)
+    r = c.place_order(a.pair, "BUY", pi.fmt_qty(qty), "LIMIT", pi.fmt_price(px))
+    show("place LIMIT", r)
     print("   ", r.data.get("OrderDetail"))
     oid = r.data.get("OrderDetail", {}).get("OrderID")
     if oid is not None:
-        r = c.query_order(order_id=oid); show("query by id", r)
-        r = c.cancel_order(order_id=oid); show("cancel", r); print("   ", r.data)
-        r = c.query_order(order_id=oid); show("query after", r)
+        r = c.query_order(order_id=oid)
+        show("query by id", r)
+        r = c.cancel_order(order_id=oid)
+        show("cancel", r)
+        print("   ", r.data)
+        r = c.query_order(order_id=oid)
+        show("query after", r)
         print("    status:", [o.get("Status") for o in r.data.get("OrderMatched", [])])
     if a.market:
         ask = float(tk["MinAsk"])
         qty = pi.floor_qty(15.0 / ask)
         print(f"\n-- market round trip: {pi.fmt_qty(qty)} {a.pair}")
-        r = c.place_order(a.pair, "BUY", pi.fmt_qty(qty), "MARKET"); show("MARKET BUY", r)
+        r = c.place_order(a.pair, "BUY", pi.fmt_qty(qty), "MARKET")
+        show("MARKET BUY", r)
         print("   ", r.data.get("OrderDetail"))
         filled = float(r.data.get("OrderDetail", {}).get("FilledQuantity", 0))
         if filled:
-            r = c.place_order(a.pair, "SELL", pi.fmt_qty(filled), "MARKET"); show("MARKET SELL", r)
+            r = c.place_order(a.pair, "SELL", pi.fmt_qty(filled), "MARKET")
+            show("MARKET SELL", r)
             print("   ", r.data.get("OrderDetail"))
 
 

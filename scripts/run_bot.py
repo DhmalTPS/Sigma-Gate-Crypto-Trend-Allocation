@@ -5,6 +5,7 @@ usage:
   python scripts/run_bot.py --profile testing               # trade the testing account
   python scripts/run_bot.py --profile deployment            # COMPETITION (run on EC2 via systemd)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,8 +30,9 @@ def main() -> None:
 
     (ROOT / "logs").mkdir(exist_ok=True)
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    fh = TimedRotatingFileHandler(ROOT / "logs" / f"bot_{a.profile}.log", when="midnight", backupCount=30,
-                                  encoding="utf-8")
+    fh = TimedRotatingFileHandler(
+        ROOT / "logs" / f"bot_{a.profile}.log", when="midnight", backupCount=30, encoding="utf-8"
+    )
     fh.setFormatter(fmt)
     sh = logging.StreamHandler()
     sh.setFormatter(fmt)

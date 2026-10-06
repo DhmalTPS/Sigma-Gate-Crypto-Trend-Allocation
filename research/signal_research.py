@@ -7,6 +7,7 @@ Also splits by regime (market trend up / down) to see conditional behaviour.
 
 usage: python research/signal_research.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -30,7 +31,7 @@ def ic_series(score: pd.DataFrame, fwd: pd.DataFrame) -> pd.Series:
     a = a.where(b.notna())
     am, bm = a.sub(a.mean(axis=1), axis=0), b.sub(b.mean(axis=1), axis=0)
     num = (am * bm).sum(axis=1)
-    den = np.sqrt((am ** 2).sum(axis=1) * (bm ** 2).sum(axis=1))
+    den = np.sqrt((am**2).sum(axis=1) * (bm**2).sum(axis=1))
     return (num / den).where(a.notna().sum(axis=1) >= 8)
 
 
@@ -57,9 +58,22 @@ def main() -> None:
             m, t = tstat_nonoverlap(ic, h)
             up = tstat_nonoverlap(ic[reg > 0.2], h)[0]
             dn = tstat_nonoverlap(ic[reg < -0.2], h)[0]
-            first, second = tstat_nonoverlap(ic.iloc[: len(ic) // 2], h)[0], tstat_nonoverlap(ic.iloc[len(ic) // 2:], h)[0]
-            rows.append({"sleeve": name, "h": h, "IC": m, "t": t, "IC_up": up, "IC_down": dn,
-                         "IC_1st_half": first, "IC_2nd_half": second})
+            first, second = (
+                tstat_nonoverlap(ic.iloc[: len(ic) // 2], h)[0],
+                tstat_nonoverlap(ic.iloc[len(ic) // 2 :], h)[0],
+            )
+            rows.append(
+                {
+                    "sleeve": name,
+                    "h": h,
+                    "IC": m,
+                    "t": t,
+                    "IC_up": up,
+                    "IC_down": dn,
+                    "IC_1st_half": first,
+                    "IC_2nd_half": second,
+                }
+            )
     df = pd.DataFrame(rows)
     pd.set_option("display.width", 160)
     print(df.round(4).to_string(index=False))

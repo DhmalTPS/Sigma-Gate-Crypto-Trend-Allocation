@@ -5,6 +5,7 @@ Resolution order for profile P in {"testing", "deployment"}:
   2. files <T105_KEY_DIR>/<P>_api_key and <P>_api_secret
      (T105_KEY_DIR defaults to ./extra_info/api_keys, which is git-ignored)
 """
+
 from __future__ import annotations
 
 import os

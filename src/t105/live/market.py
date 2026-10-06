@@ -6,26 +6,27 @@ so the bot keeps working if Binance is unreachable from the VM.
 Integrity: a pair whose Binance close deviates >2% from Roostoo's last price is
 excluded from trading for that cycle (stale/mismatched data must never drive orders).
 """
+
 from __future__ import annotations
 
 import logging
 import time
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from ..api.client import RoostooClient
-from pathlib import Path
-
-from ..data.history import binance_symbol, fetch_klines, fetch_with_fallback
+from ..data.history import fetch_with_fallback
 
 log = logging.getLogger(__name__)
 
 
 class LiveMarket:
-    def __init__(self, client: RoostooClient, pairs: list[str], lookback_h: int = 24 * 60,
-                 local_dir: Path | None = None):
+    def __init__(
+        self, client: RoostooClient, pairs: list[str], lookback_h: int = 24 * 60, local_dir: Path | None = None
+    ):
         self.local_dir = local_dir
         self.sources: dict[str, str] = {}
         self.c = client
@@ -34,7 +35,7 @@ class LiveMarket:
         self.bars: dict[str, pd.DataFrame] = {}
         self.ticker: dict[str, dict] = {}
         self.ticker_ts = 0.0
-        self.snap = defaultdict(list)   # hour -> pair -> prices (fallback bar builder)
+        self.snap = defaultdict(list)  # hour -> pair -> prices (fallback bar builder)
         self.binance_ok = True
 
     # ------------------------------------------------------------ Roostoo
@@ -80,7 +81,7 @@ class LiveMarket:
             if df.empty:
                 log.error("bootstrap %s: no history from any source", p)
                 continue
-            self.bars[p] = df.iloc[-self.lookback_h:]
+            self.bars[p] = df.iloc[-self.lookback_h :]
 
     def update_bars(self) -> None:
         """Append newly closed hourly bars (Binance, else Roostoo-snapshot fallback)."""
@@ -91,8 +92,9 @@ class LiveMarket:
             last = df.index[-1] if df is not None and len(df) else now_h - pd.Timedelta(hours=self.lookback_h)
             if last >= now_h - pd.Timedelta(hours=1):
                 continue
-            new, src = fetch_with_fallback(p, int((last + pd.Timedelta(hours=1)).timestamp() * 1000),
-                                           int(time.time() * 1000))
+            new, src = fetch_with_fallback(
+                p, int((last + pd.Timedelta(hours=1)).timestamp() * 1000), int(time.time() * 1000)
+            )
             if src != "binance":
                 fails += 1
             if new.empty:
@@ -100,15 +102,24 @@ class LiveMarket:
             if not new.empty:
                 df = pd.concat([df, new]) if df is not None else new
                 df = df[~df.index.duplicated(keep="last")].sort_index()
-                self.bars[p] = df.iloc[-self.lookback_h:]
+                self.bars[p] = df.iloc[-self.lookback_h :]
         self.binance_ok = fails < len(self.pairs) // 2
 
     def _snapshot_bar(self, pair: str, hour: pd.Timestamp) -> pd.DataFrame:
         px = self.snap.get((hour, pair))
         if not px:
             return pd.DataFrame()
-        return pd.DataFrame({"open": [px[0]], "high": [max(px)], "low": [min(px)], "close": [px[-1]],
-                             "volume": [np.nan], "quote_volume": [np.nan]}, index=[hour])
+        return pd.DataFrame(
+            {
+                "open": [px[0]],
+                "high": [max(px)],
+                "low": [min(px)],
+                "close": [px[-1]],
+                "volume": [np.nan],
+                "quote_volume": [np.nan],
+            },
+            index=[hour],
+        )
 
     def panels(self) -> dict[str, pd.DataFrame]:
         out = {}

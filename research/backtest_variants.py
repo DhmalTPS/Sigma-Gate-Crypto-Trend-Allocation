@@ -7,16 +7,15 @@ median MaxDD and median composite -- not the single best backtest number.
 
 usage: python research/backtest_variants.py [--quick]
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import sys
 import time
-from dataclasses import replace
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,10 +41,15 @@ def half_spreads(close: pd.DataFrame, info: dict) -> pd.Series:
 
 def window_table(nav: pd.Series) -> dict:
     w = M.rolling_window_stats(nav, 24 * 14, 48)
-    return {"win_med_ret": w["ret"].median(), "win_p_pos": (w["ret"] > 0).mean(),
-            "win_q10_ret": w["ret"].quantile(0.1), "win_med_mdd": w["mdd"].median(),
-            "win_q90_mdd": w["mdd"].quantile(0.9), "win_med_comp": w["composite"].median(),
-            "win_med_sharpe": w["sharpe"].median()}
+    return {
+        "win_med_ret": w["ret"].median(),
+        "win_p_pos": (w["ret"] > 0).mean(),
+        "win_q10_ret": w["ret"].quantile(0.1),
+        "win_med_mdd": w["mdd"].median(),
+        "win_q90_mdd": w["mdd"].quantile(0.9),
+        "win_med_comp": w["composite"].median(),
+        "win_med_sharpe": w["sharpe"].median(),
+    }
 
 
 def main() -> None:
@@ -69,8 +73,9 @@ def main() -> None:
 
     strat_sets = {
         "rev6+trend": StrategyParams(sleeves=("trend", "reversal"), prior_weights={"trend": 0.4, "reversal": 0.6}),
-        "rev12+trend": StrategyParams(sleeves=("trend", "reversal"), reversal_lookback=12,
-                                      prior_weights={"trend": 0.4, "reversal": 0.6}),
+        "rev12+trend": StrategyParams(
+            sleeves=("trend", "reversal"), reversal_lookback=12, prior_weights={"trend": 0.4, "reversal": 0.6}
+        ),
         "rev6_only": StrategyParams(sleeves=("reversal",), prior_weights={"reversal": 1.0}),
         "trend_only": StrategyParams(sleeves=("trend",), prior_weights={"trend": 1.0}),
     }
@@ -89,19 +94,39 @@ def main() -> None:
             if sname == "trend_only" and pname != "LO":
                 continue
             res = run(out, close, P["high"], P["low"], pol, ex, start=start, half_spread_bps=hs)
-            row = {"variant": f"{sname}|{pname}",
-                   **M.summary(res.nav, fees_paid=res.fees, turnover=res.turnover, n_trades=len(res.trades)),
-                   **window_table(res.nav), "maker_ratio": res.maker_ratio}
+            row = {
+                "variant": f"{sname}|{pname}",
+                **M.summary(res.nav, fees_paid=res.fees, turnover=res.turnover, n_trades=len(res.trades)),
+                **window_table(res.nav),
+                "maker_ratio": res.maker_ratio,
+            }
             rows.append(row)
-            print(f"{row['variant']:<22} ret {row['total_return']:+.3f} sh {row['sharpe']:.2f} "
-                  f"mdd {row['max_drawdown']:.3f} turn {row['turnover_x_nav']:.0f}x fees {row['fees_paid']:.0f} "
-                  f"maker {res.maker_ratio:.2f} | win med {row['win_med_ret']:+.4f} p+ {row['win_p_pos']:.2f} "
-                  f"mdd {row['win_med_mdd']:.3f}  ({time.time()-t0:.0f}s)", flush=True)
+            print(
+                f"{row['variant']:<22} ret {row['total_return']:+.3f} sh {row['sharpe']:.2f} "
+                f"mdd {row['max_drawdown']:.3f} turn {row['turnover_x_nav']:.0f}x fees {row['fees_paid']:.0f} "
+                f"maker {res.maker_ratio:.2f} | win med {row['win_med_ret']:+.4f} p+ {row['win_p_pos']:.2f} "
+                f"mdd {row['win_med_mdd']:.3f}  ({time.time() - t0:.0f}s)",
+                flush=True,
+            )
     df = pd.DataFrame(rows)
     pd.set_option("display.width", 220)
-    cols = ["variant", "total_return", "sharpe", "sortino", "max_drawdown", "calmar_raw", "psr_vs_0",
-            "turnover_x_nav", "fees_paid", "win_med_ret", "win_p_pos", "win_q10_ret", "win_med_mdd",
-            "win_q90_mdd", "win_med_sharpe"]
+    cols = [
+        "variant",
+        "total_return",
+        "sharpe",
+        "sortino",
+        "max_drawdown",
+        "calmar_raw",
+        "psr_vs_0",
+        "turnover_x_nav",
+        "fees_paid",
+        "win_med_ret",
+        "win_p_pos",
+        "win_q10_ret",
+        "win_med_mdd",
+        "win_q90_mdd",
+        "win_med_sharpe",
+    ]
     print(df[cols].round(3).to_string(index=False))
     df.to_csv(ROOT / "reports" / "backtest" / "variants.csv", index=False)
 

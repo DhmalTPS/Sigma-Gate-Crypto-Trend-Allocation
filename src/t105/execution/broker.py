@@ -4,6 +4,7 @@ The exchange is the single source of truth. Every cycle starts by rebuilding
 holdings from /v3/balance and /v6/short_positions -- never from local memory --
 so a crash/restart can never cause the bot to "forget" a position and re-buy it.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,33 +20,34 @@ log = logging.getLogger(__name__)
 @dataclass
 class Book:
     """Snapshot of what we actually own, from the exchange."""
+
     usd_free: float = 0.0
     usd_lock: float = 0.0
-    coins: dict = field(default_factory=dict)      # coin -> (free, lock)
-    shorts: dict = field(default_factory=dict)     # pair -> dict(qty, entry, collateral, upnl)
+    coins: dict = field(default_factory=dict)  # coin -> (free, lock)
+    shorts: dict = field(default_factory=dict)  # pair -> dict(qty, entry, collateral, upnl)
     ts: float = 0.0
 
     def long_qty(self, coin: str) -> float:
-        f, l = self.coins.get(coin, (0.0, 0.0))
-        return f + l
+        free, lock = self.coins.get(coin, (0.0, 0.0))
+        return free + lock
 
     def nav(self, mids: dict[str, float]) -> float:
         v = self.usd_free + self.usd_lock
-        for coin, (f, l) in self.coins.items():
+        for coin, (free, lock) in self.coins.items():
             px = mids.get(f"{coin}/USD")
             if px:
-                v += (f + l) * px
+                v += (free + lock) * px
         for s in self.shorts.values():
-            v += s["upnl"]          # collateral already inside usd_lock
+            v += s["upnl"]  # collateral already inside usd_lock
         return v
 
     def signed_values(self, mids: dict[str, float]) -> dict[str, float]:
         """pair -> signed USD exposure (long positive, short negative)."""
         out = {}
-        for coin, (f, l) in self.coins.items():
+        for coin, (free, lock) in self.coins.items():
             pair = f"{coin}/USD"
-            if pair in mids and (f + l) > 0:
-                out[pair] = (f + l) * mids[pair]
+            if pair in mids and (free + lock) > 0:
+                out[pair] = (free + lock) * mids[pair]
         for pair, s in self.shorts.items():
             if pair in mids:
                 out[pair] = out.get(pair, 0.0) - s["qty"] * mids[pair]
@@ -80,19 +82,21 @@ class Broker:
         wallet = b.data.get("SpotWallet") or b.data.get("Wallet") or {}
         bk = Book(ts=time.time())
         for coin, v in wallet.items():
-            f, l = float(v.get("Free", 0) or 0), float(v.get("Lock", 0) or 0)
+            free, lock = float(v.get("Free", 0) or 0), float(v.get("Lock", 0) or 0)
             if coin == "USD":
-                bk.usd_free, bk.usd_lock = f, l
-            elif f or l:
-                bk.coins[coin] = (f, l)
+                bk.usd_free, bk.usd_lock = free, lock
+            elif free or lock:
+                bk.coins[coin] = (free, lock)
         if self.shorts_supported:
             s = self.c.short_positions()
             if s.ok:
                 for p in s.data.get("Positions", []) or []:
-                    bk.shorts[p["Pair"]] = {"qty": float(p.get("ShortQty", 0) or 0),
-                                            "entry": float(p.get("EntryPrice", 0) or 0),
-                                            "collateral": float(p.get("Collateral", 0) or 0),
-                                            "upnl": float(p.get("UnrealizedPNL", 0) or 0)}
+                    bk.shorts[p["Pair"]] = {
+                        "qty": float(p.get("ShortQty", 0) or 0),
+                        "entry": float(p.get("EntryPrice", 0) or 0),
+                        "collateral": float(p.get("Collateral", 0) or 0),
+                        "upnl": float(p.get("UnrealizedPNL", 0) or 0),
+                    }
             elif "does not allow" in s.err:
                 self._disable_shorts(s.err)
             elif "permission" in s.err:
@@ -119,22 +123,34 @@ class Broker:
 
     # ------------------------------------------------------------ orders
     def _record(self, kind: str, pair: str, req: dict, r: ApiResult, why: str) -> None:
-        self.audit.write("order", {"kind": kind, "pair": pair, "request": req, "ok": r.ok,
-                                   "err": r.err, "ambiguous": r.ambiguous, "reason": why,
-                                   "response": r.data})
+        self.audit.write(
+            "order",
+            {
+                "kind": kind,
+                "pair": pair,
+                "request": req,
+                "ok": r.ok,
+                "err": r.err,
+                "ambiguous": r.ambiguous,
+                "reason": why,
+                "response": r.data,
+            },
+        )
 
     def _resolve_ambiguous(self, pair: str, side: str, qty: str, t_send_ms: int) -> dict | None:
         """After a lost response: did the order reach the exchange? Look it up, never re-send."""
         time.sleep(2.0)
         r = self.c.query_order(pair=pair, limit=10)
         for o in r.data.get("OrderMatched", []) if r.ok else []:
-            if o.get("Side") == side and abs(float(o.get("Quantity", 0)) - float(qty)) < 1e-12 \
-                    and int(o.get("CreateTimestamp", 0)) >= t_send_ms - 5000:
+            if (
+                o.get("Side") == side
+                and abs(float(o.get("Quantity", 0)) - float(qty)) < 1e-12
+                and int(o.get("CreateTimestamp", 0)) >= t_send_ms - 5000
+            ):
                 return o
         return None
 
-    def spot(self, pair: str, side: str, qty: float, order_type: str, price: float | None,
-             why: str) -> dict | None:
+    def spot(self, pair: str, side: str, qty: float, order_type: str, price: float | None, why: str) -> dict | None:
         pi = self.pairs[pair]
         q = pi.fmt_qty(qty)
         if float(q) <= 0:
