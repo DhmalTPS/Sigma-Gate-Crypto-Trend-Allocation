@@ -51,18 +51,21 @@ decision, order and fill.
 | Worst drawdown in any 14-day window | **6.1 %** | — |
 | Robustness | all 13 single-parameter perturbations Sharpe > 0.5 | — |
 
-**Live contest evidence (as of 2026-10-06, from the bot's logs and the exchange):**
+**Live contest (interim, 2026-10-04 12:00 → 2026-10-06 11:00 UTC; refreshed at the end of the contest):**
+
+![Live contest NAV and drawdown](docs/img/live_nav.png)
 
 | | |
 |---|---|
-| Uptime | continuous since contest open, 0 crashes |
-| Fills | 100 % passive limit orders (maker fee 0.05 %), fees ≈ 0.035 % of NAV |
-| API | 4,200+ calls, 0 real errors, peak 15 requests/min (no-HFT) |
+| Return so far | −0.01 % (peak +0.68 %) |
+| Max drawdown (hourly) | 1.19 % |
+| Realised volatility | 17 % annualised (target 30 %; calm market) |
+| Fills | 100 % passive limit orders (maker fee 0.05 %); fees ≈ 0.035 % of NAV |
+| Uptime / API | continuous since contest open, 0 crashes; 4,200+ calls, 0 real errors, peak 15 req/min |
 | Compliance blocks / manual trades | 0 / 0 |
-| Max drawdown | 1.6 % |
 
-The full live NAV curve is added here at the end of the contest (`scripts/export_live.py` →
-`reports/live/` → `scripts/make_charts.py`).
+Data: [`reports/live/nav_hourly.csv`](reports/live/nav_hourly.csv), exported from the bot's own NAV
+log with `scripts/export_live.py`.
 
 ## 2. Architecture
 

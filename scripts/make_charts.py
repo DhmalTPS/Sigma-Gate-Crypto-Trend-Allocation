@@ -45,7 +45,15 @@ def style(ax, title=None):
 
 def end_label(ax, x, y, text, color):
     ax.annotate(
-        text, (x, y), xytext=(6, 0), textcoords="offset points", va="center", fontsize=9, color=INK, fontweight="bold"
+        text,
+        (x, y),
+        xytext=(6, 0),
+        textcoords="offset points",
+        va="center",
+        fontsize=9,
+        color=INK,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.2", facecolor=SURFACE, edgecolor="none"),
     )
     ax.plot([x], [y], "o", color=color, markersize=6, markeredgecolor=SURFACE, markeredgewidth=2)
 
@@ -175,15 +183,8 @@ def live_nav() -> None:
     style(a2)
     a2.plot(dd.index, dd, color=S1, linewidth=2)
     a2.set_ylabel("Drawdown (%)", color=INK2, fontsize=9)
-    a2.annotate(
-        f"max {dd.min():.2f}%",
-        (dd.idxmin(), dd.min()),
-        xytext=(6, -2),
-        textcoords="offset points",
-        fontsize=9,
-        color=INK,
-        va="top",
-    )
+    a2.text(0.01, 0.08, f"max drawdown {dd.min():.2f}%", transform=a2.transAxes, fontsize=9, color=INK)
+    a1.annotate("start $100k", (nav.index[0], 100), xytext=(0, 5), textcoords="offset points", fontsize=8, color=INK2)
     fig.text(0.01, 0.005, "Source: bot NAV log (reports/live/nav_hourly.csv), start $100,000", fontsize=8, color=INK2)
     fig.tight_layout(rect=(0, 0.02, 1, 1))
     fig.savefig(OUT / "live_nav.png", dpi=160, facecolor=SURFACE)
