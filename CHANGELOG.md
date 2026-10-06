@@ -2,6 +2,17 @@
 
 All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTROL.md`.
 
+## v1.1.1 — 2026-10-06 (live, Tier 2 bug fix)
+
+* **Bug:** the daily activity guard compared against the *banded* target, so on quiet days where
+  holdings already sat inside the no-trade band it found no gap and placed nothing. Found via
+  `scripts/report.py` (active trading days = 2 after 3 days). Risk: failing the ">= 8 active trading
+  days with enough trades" rule.
+* **Fix:** guard uses the unbanded target, moves the most mis-weighted coin 0.5-2% NAV toward it as a
+  MARKET order (certain fill, ~$0.50 fee), targets >= 2 fills/UTC day, retries hourly from 12:00 UTC.
+  Never trades if today's fills cannot be counted. Strategy and parameters unchanged.
+* **Also:** contest start corrected to 2026-10-04 12:00 UTC; "no permission" no longer disables shorts.
+
 ## v1.1-gate-deadband — 2026-10-02 (pre-competition)
 
 * **Hypothesis:** hourly evaluation of sign gates causes noise flips; a ±0.5σ dead-band

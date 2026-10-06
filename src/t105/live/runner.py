@@ -193,26 +193,19 @@ class Bot:
         self.state["nav_hist"] = st.nav_hist
 
         # 6) orders (deployment keys never trade before the contest window opens)
-        not_before = pd.Timestamp(self.live_cfg.get("trade_not_before_utc", "1970-01-01"), tz="UTC")             if self.profile == "deployment" else pd.Timestamp(0, tz="UTC")
+        not_before = pd.Timestamp(0, tz="UTC")
+        if self.profile == "deployment":
+            not_before = pd.Timestamp(self.live_cfg.get("trade_not_before_utc", "1970-01-01"), tz="UTC")
         if pd.Timestamp.now(tz="UTC") < not_before:
             self.audit.write("health", {"event": "pre_contest_hold", "until": str(not_before)})
             w = cur_w.reindex(w.index).fillna(0.0) if len(cur_w) else w * 0.0
         orders = self._execute(w, cur_w, bk, nav, mids, ex, urgent=breaker or diag.get("dd_mult", 1) < 0.6)
 
-        # 7) daily activity guard: >= 8 active days required -> make sure each day trades
-        hour = datetime.now(timezone.utc).hour
-        if hour >= self.live_cfg.get("activity_guard_hour_utc", 18) and not orders and not breaker:
-            filled = self._filled_today()
-            if filled == 0:
-                gap = (w.reindex(cur_w.index.union(w.index)).fillna(0) - cur_w.reindex(cur_w.index.union(w.index)).fillna(0))
-                gap = gap[gap.abs() * nav > 50]
-                if len(gap):
-                    j = gap.abs().idxmax()
-                    tgt = cur_w.get(j, 0.0) + np.sign(gap[j]) * min(abs(gap[j]), 0.02)
-                    wg = cur_w.copy()
-                    wg[j] = tgt
-                    orders = self._execute(wg, cur_w, bk, nav, mids, ex, urgent=True, only=[j],
-                                           reason="activity_guard")
+        # 7) daily activity guard: the rules require >= 8 active days "with enough trades"
+        if not breaker and pd.Timestamp.now(tz="UTC") >= not_before:
+            g = self._activity_guard(alpha, out, t, cur_w, bk, nav, mids, ex, pol, st)
+            if g:
+                orders = orders + g
 
         # 8) shadows + logging
         px = P["close"].loc[t]
@@ -229,6 +222,48 @@ class Bot:
             "binance_ok": self.market.binance_ok, "version": self.cfg["version"]})
         self.state["last_cycle_hour"] = str(pd.Timestamp.now(tz="UTC").floor("h"))
         self._save_state()
+
+    def _activity_guard(self, alpha, out, t, cur_w, bk, nav, mids, ex, pol, st) -> list:
+        """Guarantee >= min_fills_per_day fills per UTC day with a small, strategy-consistent trade.
+
+        Uses the *unbanded* target (the no-trade band is what normally suppresses trades on quiet
+        days), moves the most mis-weighted coin toward it by 0.5%-2% NAV, as a MARKET order so the
+        fill is certain (cost ~$0.50). If every coin is exactly on target it trims the largest
+        holding by 0.5% NAV (risk-reducing). Never runs before guard hour or if fills can't be counted.
+        """
+        import copy
+        from dataclasses import replace as dc_replace
+        hour = datetime.now(timezone.utc).hour
+        if hour < self.live_cfg.get("activity_guard_hour_utc", 12):
+            return []
+        need = int(self.live_cfg.get("min_fills_per_day", 2))
+        filled = self._filled_today()
+        if filled < 0 or filled >= need:
+            return []
+        raw_pol = dc_replace(pol, band_abs=0.0, band_rel=0.0, min_trade_usd=0.0)
+        w_raw, _ = target_weights(alpha, out.vol.loc[t], out.regime.loc[t], out.returns.tail(pol.cov_window),
+                                  cur_w, nav, copy.deepcopy(st), raw_pol,
+                                  shorts_enabled=self.broker.shorts_supported)
+        idx = cur_w.index.union(w_raw.index)
+        gap = (w_raw.reindex(idx).fillna(0) - cur_w.reindex(idx).fillna(0))
+        gap = gap[[p for p in gap.index if p in self.pairs and p in mids]]
+        if len(gap) == 0:
+            return []
+        j = gap.abs().idxmax()
+        lo, hi = 0.005, 0.02
+        if abs(gap[j]) > 1e-4:
+            step = float(np.sign(gap[j])) * min(max(abs(gap[j]), lo), hi)
+        else:
+            held = cur_w[cur_w.abs() > lo]
+            if len(held) == 0:
+                return []
+            j = held.abs().idxmax()
+            step = -float(np.sign(held[j])) * lo
+        wg = cur_w.copy()
+        wg[j] = cur_w.get(j, 0.0) + step
+        self.audit.write("health", {"event": "activity_guard", "fills_today": filled, "need": need,
+                                    "pair": j, "step_w": round(step, 4)})
+        return self._execute(wg, cur_w, bk, nav, mids, ex, urgent=True, only=[j], reason="activity_guard")
 
     def _execute(self, w: pd.Series, cur_w: pd.Series, bk: Book, nav: float, mids: dict,
                  ex, urgent: bool, only: list | None = None, reason: str = "rebalance") -> list:

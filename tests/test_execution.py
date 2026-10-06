@@ -135,3 +135,47 @@ def test_does_not_allow_disables_then_rechecks(tmp_path):
     b.c.short_err = "boom"
     b.book()
     assert b.shorts_supported or b.shorts_retry_at > 0
+
+
+def _guard_bot(tmp_path, filled_today):
+    import numpy as np
+    from t105.portfolio.policy import PolicyState
+    bot = _bot(tmp_path)
+    bot.live_cfg = {"activity_guard_hour_utc": 0, "min_fills_per_day": 2}
+    bot._filled_today = lambda: filled_today
+    idx = pd.date_range("2026-10-01", periods=400, freq="1h", tz="UTC")
+    cols = ["BTC/USD", "ETH/USD"]
+    rng = np.random.default_rng(0)
+    out = SimpleNamespace(vol=pd.DataFrame(0.01, idx, cols),
+                          regime=pd.DataFrame({"mkt_trend": 0.2, "risk_on": 0.6}, index=idx),
+                          returns=pd.DataFrame(rng.normal(0, 0.01, (400, 2)), idx, cols))
+    alpha = pd.Series({"BTC/USD": 1.0, "ETH/USD": 1.0})
+    return bot, out, idx[-1], alpha, PolicyState(peak_nav=1e5)
+
+
+def test_activity_guard_trades_when_on_target_and_no_fills(tmp_path):
+    from t105.portfolio.policy import PolicyState, target_weights
+    bot, out, t, alpha, st = _guard_bot(tmp_path, filled_today=0)
+    pol = bot.cfg["policy"]
+    # current == banded target (the situation where the old guard did nothing)
+    w, _ = target_weights(alpha, out.vol.loc[t], out.regime.loc[t], out.returns, pd.Series(dtype=float),
+                          1e5, PolicyState(peak_nav=1e5), pol)
+    cur = w[w != 0]
+    bk = Book(usd_free=50_000, coins={"BTC": (cur.get("BTC/USD", 0) * 1e5 / 100, 0),
+                                      "ETH": (cur.get("ETH/USD", 0) * 1e5 / 100, 0)})
+    mids = {"BTC/USD": 100.0, "ETH/USD": 100.0}
+    sent = bot._activity_guard(alpha, out, t, cur, bk, 1e5, mids, bot.cfg["execution"], pol, st)
+    assert len(sent) == 1 and sent[0]["reason"] == "activity_guard"
+    assert bot.broker.calls[-1][4] == "MARKET"                       # fill must be certain
+    assert 400 <= sent[0]["usd"] <= 2100                             # 0.5%..2% NAV
+
+
+def test_activity_guard_quiet_when_enough_fills_or_unknown(tmp_path):
+    bot, out, t, alpha, st = _guard_bot(tmp_path, filled_today=2)
+    mids = {"BTC/USD": 100.0, "ETH/USD": 100.0}
+    cur = pd.Series({"BTC/USD": 0.2})
+    assert bot._activity_guard(alpha, out, t, cur, Book(usd_free=80_000, coins={"BTC": (200.0, 0)}), 1e5, mids,
+                               bot.cfg["execution"], bot.cfg["policy"], st) == []
+    bot._filled_today = lambda: -1                                    # API failure: never trade blind
+    assert bot._activity_guard(alpha, out, t, cur, Book(usd_free=80_000, coins={"BTC": (200.0, 0)}), 1e5, mids,
+                               bot.cfg["execution"], bot.cfg["policy"], st) == []
