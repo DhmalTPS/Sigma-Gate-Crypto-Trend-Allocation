@@ -277,7 +277,7 @@ def s_api(api):
 
 @section
 def s_shadows(decisions):
-    hdr("9. SHADOW PORTFOLIOS (same signals, alternative settings; base 100,000 at bot start)")
+    hdr("9. SHADOW PORTFOLIOS (same signals, alternative settings; reset to 100,000 at each bot restart)")
     real = [d for d in decisions if d.get("shadows")]
     last = real[-1]
     first_nav = None
@@ -292,7 +292,7 @@ def s_shadows(decisions):
 
 
 @section
-def s_compliance(comp, decisions):
+def s_compliance(comp, decisions, cfg):
     hdr("10. COMPLIANCE & ACTIVITY")
     print(f"  orders blocked by compliance gate: {len(comp)}", dict(Counter(c.get('blocked') for c in comp)) if comp else "")
     per_day = defaultdict(int)
@@ -301,7 +301,9 @@ def s_compliance(comp, decisions):
             if not o.get("dry_run") and (o.get("status") or o.get("ok")):
                 per_day[d["ts"][:10]] += 1
     print("  accepted orders per UTC day (local log):", dict(per_day))
-    print("  activity guard hour (UTC):", 18)
+    lc = cfg["live"]
+    print(f"  activity guard: from {lc.get('activity_guard_hour_utc', 12)}:00 UTC, "
+          f"target >= {lc.get('min_fills_per_day', 2)} fills per UTC day")
 
 
 def main() -> None:
@@ -323,7 +325,7 @@ def main() -> None:
     s_exchange(cfg)
     s_api(load_jsonl(logdir, "api"))
     s_shadows(decisions)
-    s_compliance(load_jsonl(logdir, "compliance"), decisions)
+    s_compliance(load_jsonl(logdir, "compliance"), decisions, cfg)
     print("\n(read-only report: nothing was traded, changed or cancelled)")
 
 
