@@ -29,6 +29,7 @@ class LiveMarket:
     ):
         self.local_dir = local_dir
         self.sources: dict[str, str] = {}
+        self.last_update_src: dict[str, str] = {}
         self.c = client
         self.pairs = pairs
         self.lookback_h = lookback_h
@@ -97,8 +98,14 @@ class LiveMarket:
             )
             if src != "binance":
                 fails += 1
+            # Only bars NEWER than what we hold count. (The bundled-snapshot fallback returns old
+            # data; treating it as "new" blocked the Roostoo-snapshot bar and left the coin stale.)
+            if not new.empty:
+                new = new[new.index > last]
             if new.empty:
                 new = self._snapshot_bar(p, now_h - pd.Timedelta(hours=1))
+                src = "roostoo_snapshot" if not new.empty else "stale"
+            self.last_update_src[p] = src
             if not new.empty:
                 df = pd.concat([df, new]) if df is not None else new
                 df = df[~df.index.duplicated(keep="last")].sort_index()

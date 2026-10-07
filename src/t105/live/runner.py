@@ -38,6 +38,17 @@ from ..strategy.core import compute
 log = logging.getLogger("t105.bot")
 
 
+def hold_unreliable(w: pd.Series, cur_w: pd.Series, unreliable: list) -> pd.Series:
+    """Keep coins with unreliable data at their current weight (no trade on bad data).
+    The other coins' targets are untouched."""
+    if not unreliable:
+        return w
+    w = w.copy()
+    for p in unreliable:
+        w[p] = float(cur_w.get(p, 0.0))
+    return w
+
+
 class ShadowBook:
     """Paper portfolio of an alternative policy, marked hourly with an estimated cost.
     Gives live, counterfactual evidence for change decisions during the contest."""
@@ -204,8 +215,12 @@ class Bot:
         out = compute(P["close"], P["quote_volume"], self.cfg["strategy"], self.pp)
         t = out.alpha.index[-1]
         alpha = out.alpha.loc[t].copy()
+        # Data-integrity check: a coin whose latest bar disagrees with Roostoo's live price is
+        # HELD at its current weight this cycle. Its alpha is NOT removed: removing it would
+        # re-normalise the other coins' risk budgets (bug seen live 2026-10-07 02:01 UTC).
         ok = self.market.integrity_mask(P["close"].loc[t])
-        alpha[~ok.reindex(alpha.index).fillna(False)] = np.nan
+        unreliable = [p for p in alpha.index if not bool(ok.get(p, False))]
+        self._unreliable = unreliable
 
         # 5) policy
         cur_val = bk.signed_values(mids)
@@ -231,6 +246,8 @@ class Bot:
             pol,
             shorts_enabled=self.broker.shorts_supported,
         )
+        w = hold_unreliable(w, cur_w, unreliable)
+        diag["integrity_hold"] = unreliable
         if breaker:
             w = w * 0.0
         self.state["active"] = st.active
@@ -273,6 +290,7 @@ class Bot:
                 "shadows": shadow,
                 "elapsed_s": round(time.time() - t0, 1),
                 "binance_ok": self.market.binance_ok,
+                "bar_update_src": dict(self.market.last_update_src),
                 "version": self.cfg["version"],
             },
         )
@@ -311,7 +329,8 @@ class Bot:
         )
         idx = cur_w.index.union(w_raw.index)
         gap = w_raw.reindex(idx).fillna(0) - cur_w.reindex(idx).fillna(0)
-        gap = gap[[p for p in gap.index if p in self.pairs and p in mids]]
+        bad = set(getattr(self, "_unreliable", []))
+        gap = gap[[p for p in gap.index if p in self.pairs and p in mids and p not in bad]]
         if len(gap) == 0:
             return []
         j = gap.abs().idxmax()

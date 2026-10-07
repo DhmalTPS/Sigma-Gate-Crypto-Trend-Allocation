@@ -2,6 +2,21 @@
 
 All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTROL.md`.
 
+## v1.1.2 — 2026-10-07 (live, Tier 2 bug fix)
+
+* **Incident:** at 02:01 UTC one coin's (XRP) newest hourly bar was missing, so its last close disagreed
+  with Roostoo's live price by > 2 % and the integrity check fired. The check set that coin's alpha to
+  NaN, which (a) set its target to 0 -> closed a profitable XRP short, and (b) removed it from the
+  inverse-vol normalisation -> other coins' targets were inflated (BNB 19.1 % -> 24.7 %, SOL 13.2 % -> 16.8 %)
+  and the bot bought them, reversing an hour later when data recovered. Cost: ~$25 fees + a closed short.
+  Confirmed from `decision.jsonl` (XRP absent from alpha at 02:01 only).
+* **Root cause 2:** in `update_bars`, the last-resort bundled snapshot returns *old* bars; treating them
+  as "new data" prevented the Roostoo-snapshot bar from being built, so the coin stayed stale.
+* **Fix:** (1) unreliable coins are *held* at their current weight; their alpha stays in the sizing so
+  other coins are unaffected; the activity guard skips them. (2) only bars newer than the last held bar
+  count; otherwise the bar is built from Roostoo snapshots. Per-coin bar source logged every cycle.
+* **Evidence:** 3 regression tests reproduce the incident; strategy and parameters unchanged.
+
 ## v1.1.1 — 2026-10-06 (live, Tier 2 bug fix)
 
 * **Bug:** the daily activity guard compared against the *banded* target, so on quiet days where
