@@ -2,6 +2,24 @@
 
 All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTROL.md`.
 
+## v1.2-endgame — 2026-10-08 (live, Tier 4 parameter change with evidence)
+
+* **Situation:** NAV −1.95 % after the Oct 7 market drop, drawdown 2.8 % (just below the 3 % governor
+  trigger), ~9 days left. With a negative return every ratio is negative, so the objective is now
+  P(finish > 0), which requires ≈ +2.1 % from here.
+* **Hypothesis:** (1) the 30-day gate barely moves within the remaining horizon; shorter gates match it.
+  (2) the drawdown governor (3 %→10 %) was designed to protect a lead and would cut exposure exactly
+  when recovery needs it.
+* **Change:** `gate_lookbacks` [168, 336, 720] → [126, 252, 540] (×0.75, a point on the pre-launch
+  robustness plateau); `dd_soft/dd_hard` 0.03/0.10 → 0.06/0.15. Everything else unchanged.
+* **Evidence** (`research/endgame.py`, full engine, every 10-day window, `reports/backtest/endgame.csv`):
+  P(10-day > +2.1 %) from a ≥2 % drawdown 13 % → 16 %; median from a drawdown −0.16 % → −0.07 %;
+  q10 −2.5 % → −2.4 %; worst 10-day −5.1 % → −5.6 %; full-history Sharpe 0.94 → 1.28, MaxDD 10.5 % → 10.1 %.
+  More aggressive variants (40 % vol, full shorts) raised P by ≤ 6 pts but worsened the worst case to
+  −7 % … −12 %, so they were rejected.
+* **Immediate effect:** one position changes (SOL +4.5 % long → −2.4 % short, its 5-day gate is down).
+* **Rollback condition:** none planned for the remaining days (no reactive re-tuning).
+
 ## v1.1.2 — 2026-10-07 (live, Tier 2 bug fix)
 
 * **Incident:** at 02:01 UTC one coin's (XRP) newest hourly bar was missing, so its last close disagreed

@@ -101,6 +101,25 @@ governor now uses the **rolling 14‑day peak**, which gives the same behaviour 
 contest and an honest backtest. Result (v1.1): Sharpe 0.94, MaxDD 10.5 %, fees $3.1k;
 all 13 single-parameter perturbations positive (README §6).
 
+## R7. End-game re-calibration (live, 2026-10-08) — `research/endgame.py`
+
+Question: from −2 % with ~10 days left, which variant maximises P(finish positive) without a bad tail?
+All 10-day windows of the full-engine backtest; "from dd" = windows starting ≥ 2 % below the 14-day peak.
+
+| Variant | P(>+2.1 %) | from dd | median from dd | q10 | worst | Sharpe / MaxDD |
+|---|---|---|---|---|---|---|
+| A v1.1 (live) | 16 % | 13 % | −0.16 % | −2.5 % | −5.1 % | 0.94 / 10.5 % |
+| E looser DD governor | 17 % | 14 % | −0.12 % | −2.6 % | −5.3 % | 0.92 / 11.2 % |
+| F 40 % vol + looser DD | 19 % | 16 % | −0.15 % | −3.2 % | −7.7 % | 0.76 / 14.7 % |
+| **H faster gates + looser DD** | **18 %** | **16 %** | **−0.07 %** | **−2.4 %** | −5.6 % | **1.28 / 10.1 %** |
+| I faster + 40 % vol + looser DD | 21 % | 17 % | −0.36 % | −3.0 % | −7.3 % | 1.04 / 13.7 % |
+| G 40 % vol + full shorts + looser DD | 22 % | 22 % | −0.22 % | −3.9 % | −11.8 % | 0.71 / 20.0 % |
+
+Differences of a few points are within noise (~50 independent 10-day windows → ±5 pts). H was chosen
+because it matches the best conditional probability of the moderate options while having the best
+median, bad-case and full-history risk profile; its lookbacks are a pre-launch plateau point, not a new
+search. Adopted as v1.2-endgame.
+
 ## Honest limitations
 
 * 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.

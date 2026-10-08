@@ -1,12 +1,14 @@
 # Team105 production strategy configuration. Every live change must be a git
 # commit to this file (or code) with a CHANGELOG entry -- see docs/CHANGE_CONTROL.md.
-version: "v1.1-gate-deadband"
+version: "v1.2-endgame"
 
 strategy:
   sleeves: ["tgate"]
   prior_weights: {tgate: 1.0}
   universe: ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD"]
-  gate_lookbacks: [168, 336, 720]      # 7d / 14d / 30d -- an ensemble, not a tuned single value
+  # v1.2 end-game (2026-10-08): lookbacks x0.75 (5.25d/10.5d/22.5d) to match the ~9 days left;
+  # x0.75 was on the pre-launch robustness plateau (research/endgame.py, R7). v1.1 used [168, 336, 720].
+  gate_lookbacks: [126, 252, 540]
   gate_dead_band: 0.5                  # gate flips only when |z| > 0.5 sigma (R6: kills hourly churn)
   vol_halflife: 72
   min_history_h: 720
@@ -23,8 +25,8 @@ policy:
   max_gross: 0.95                      # 1x rule, minus a 5% cash buffer for fees / rounding
   max_weight: 0.30
   max_weight_major: 0.40
-  dd_soft: 0.03
-  dd_hard: 0.10
+  dd_soft: 0.06                        # v1.2: was 0.03 -- the brake protected a lead; now we are behind
+  dd_hard: 0.15                        # v1.2: was 0.10
   dd_floor: 0.25
   dd_peak_window_h: 336                # drawdown from rolling 14-day peak
   band_abs: 0.03                       # trade a name only if |dw| > 3% NAV ...

@@ -150,6 +150,14 @@ w      = w · DD_multiplier                           1 → 0.25 as drawdown goe
                                                      (rolling 14-day peak)
 ```
 
+> **Live end-game re-calibration (v1.2, 2026-10-08).** After the Oct 7 market drop left the book at
+> −2 % with ~9 days to go, the gate lookbacks were shortened ×0.75 (to 126/252/540 h, matching the
+> remaining horizon) and the drawdown governor moved from 3→10 % to 6→15 % (it was built to protect a
+> lead, not to block a recovery). Evidence: full-engine 10-day windows, P(finish positive from a
+> drawdown) 13 % → 16 %, full-history Sharpe 0.94 → 1.28, MaxDD 10.5 % → 10.1 %
+> ([`docs/RESEARCH_LOG.md`](docs/RESEARCH_LOG.md) R7, [`CHANGELOG.md`](CHANGELOG.md)). Backtest figures
+> below are for v1.1, the configuration that ran from contest start.
+
 The book is fully invested at the target volatility only when every gate is on. As trends
 break, exposure **falls**; it is never re-normalised back to 100 %. Covariance (not the sum of
 single-coin risks) sets the scale, because crypto correlations are high. A no-trade band
