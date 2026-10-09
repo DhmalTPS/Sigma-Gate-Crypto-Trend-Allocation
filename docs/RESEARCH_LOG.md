@@ -120,6 +120,14 @@ because it matches the best conditional probability of the moderate options whil
 median, bad-case and full-history risk profile; its lookbacks are a pre-launch plateau point, not a new
 search. Adopted as v1.2-endgame.
 
+## R8. Separate equity-token sleeve (offline, 2026-10-09) — `research/equity_sleeve.py`
+
+Would a second, independent sleeve trading Roostoo's tokenised US stocks help? 13 tokens with ≥ 90 days of
+history (only ~112 days exist). Correlation with the crypto basket +0.53 (hourly) / +0.46 (daily); trend gates on
+tokens lose after fees (Sharpe −1.9 to −3.0, negative in the first half); equal-weight hold +22 % is a single
+AI-stock rally regime; adding a 20 % token sleeve to the crypto sleeve lowered return (+5.2 % → +3.3 %) and
+Sharpe (1.29 → 0.98) over the same period. **Rejected for live use**; design kept in `docs/V2_ROADMAP.md`.
+
 ## Honest limitations
 
 * 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.
