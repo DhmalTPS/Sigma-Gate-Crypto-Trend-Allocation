@@ -19,3 +19,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# local working notes (not part of the submission)
+HANDOFF.md
