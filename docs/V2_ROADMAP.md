@@ -20,4 +20,7 @@ stock history (token history is only ~3–4 months), and a combined-portfolio te
 - Equal-weight hold +22 % (Sharpe 2.4, MaxDD 19 %) = one AI-stock rally regime, not a repeatable rule.
 - 80 % crypto + 20 % token sleeve vs crypto alone, same period: return +5.2 % → +3.3 %, Sharpe 1.29 → 0.98.
 
+- Broader sweep (R8b/R8c): a 6 h cross-sectional reversal looked strong (Sharpe 4.1) but collapses to a median
+  Sharpe of 0.2 when the rebalance hour is varied — a timing artefact.
+
 **Decision:** not deployed during the contest. Revisit with multi-year stock data and an equity-specific signal.

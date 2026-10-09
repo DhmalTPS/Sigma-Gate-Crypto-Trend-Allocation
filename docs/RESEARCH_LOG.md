@@ -128,6 +128,17 @@ tokens lose after fees (Sharpe −1.9 to −3.0, negative in the first half); eq
 AI-stock rally regime; adding a 20 % token sleeve to the crypto sleeve lowered return (+5.2 % → +3.3 %) and
 Sharpe (1.29 → 0.98) over the same period. **Rejected for live use**; design kept in `docs/V2_ROADMAP.md`.
 
+**R8b — broader check** (`research/equity_sleeve_robust.py`): 13 rules (trend-gate sweep, cross-sectional
+momentum/reversal, session timing) with per-token spread costs. Best: long the 4 biggest 6 h losers, daily
+rebalance — Sharpe 4.11, +50 %, positive in both halves; 20 % of it beside the crypto sleeve lifted Sharpe
+1.24 → 3.09. But the deflated threshold for 13 trials is 3.72 and the bootstrap 90 % CI is [0.40, 8.30].
+
+**R8c — stress test** (`research/equity_reversal_stress.py`): the same rule rebalanced at each of the 24
+hours of the day gives median Sharpe **0.21** (range −2.69 … +4.50, positive at 13/24 offsets). The headline
+result came from one lucky rebalance hour; all other checks (lookback × top-K grid, 2× costs, weekends
+removed, excess over hold, leave-one-out) shared that hour and inherited the luck. **Verdict: artefact, not
+an edge. Equity-token sleeve stays rejected.** Lesson: always vary *when* a rule trades, not only its parameters.
+
 ## Honest limitations
 
 * 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.
