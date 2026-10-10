@@ -260,7 +260,15 @@ class Bot:
         if pd.Timestamp.now(tz="UTC") < not_before:
             self.audit.write("health", {"event": "pre_contest_hold", "until": str(not_before)})
             w = cur_w.reindex(w.index).fillna(0.0) if len(cur_w) else w * 0.0
-        orders = self._execute(w, cur_w, bk, nav, mids, ex, urgent=breaker or diag.get("dd_mult", 1) < 0.6)
+        orders = self._execute(
+            w,
+            cur_w,
+            bk,
+            nav,
+            mids,
+            ex,
+            urgent=breaker or diag.get("dd_mult", 1) < 0.6 or bool(diag.get("endgame_floor_hit")),
+        )
 
         # 7) daily activity guard: the rules require >= 8 active days "with enough trades"
         if not breaker and pd.Timestamp.now(tz="UTC") >= not_before:

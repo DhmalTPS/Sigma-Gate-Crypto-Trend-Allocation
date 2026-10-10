@@ -103,3 +103,24 @@ def test_compliance_blocks(tmp_path):
     assert not c.check("BTC/USD", "BUY", 100, 1e5, 1.2, {}, True, 0)[0]  # leverage
     assert not c.check("BTC/USD", "BUY", 100, 1e5, 0.5, {"BTC/USD": {"SELL"}}, True, 0)[0]  # MM-like
     assert c.check("BTC/USD", "SELL", 60_000, 1e5, 0.2, {}, True, 0, risk_reducing=True)[0]
+
+
+def test_endgame_long_basket_and_floor():
+    from dataclasses import replace as _r
+
+    alpha, vol, rets, regime = _row(5)
+    alpha[:] = -1 / 3  # gates all down: end-game ignores them
+    p = _r(
+        PolicyParams(sizing="absolute"),
+        endgame_long=0.60,
+        max_weight=0.30,
+        max_weight_major=0.40,
+        band_abs=0.0,
+        band_rel=0.0,
+        dd_soft=0.06,
+        dd_hard=0.15,
+    )
+    w, d = target_weights(alpha, vol, regime, rets, pd.Series(dtype=float), 97_500, PolicyState(100_900), p)
+    assert d["endgame"] and (w >= 0).all() and abs(w.sum() - 0.60) < 1e-6
+    w2, d2 = target_weights(alpha, vol, regime, rets, w, 95_400, PolicyState(100_900), p)
+    assert d2["endgame_floor_hit"] and w2.abs().sum() == 0  # contest return -4.6% -> flat

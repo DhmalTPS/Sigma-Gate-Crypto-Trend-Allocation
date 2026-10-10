@@ -43,6 +43,11 @@ class PolicyParams:
     band_abs: float = 0.02  # do not trade a name unless |dw| > 2% NAV ...
     band_rel: float = 0.25  # ... or > 25% of its target
     min_trade_usd: float = 50.0
+    # Tournament end-game mode (0 = off). Holds a fixed net-long inverse-vol basket of the universe,
+    # ignoring the trend gates, because a negative contest return makes every scored ratio negative.
+    endgame_long: float = 0.0
+    endgame_floor_return: float = -0.045  # below this contest return -> flat (protect the top-20 cut)
+    initial_nav: float = 100_000.0
 
 
 @dataclass
@@ -100,6 +105,8 @@ def target_weights(
 ) -> tuple[pd.Series, dict]:
     """Return (final target weights, diagnostics). Weights are signed fractions of NAV."""
     st.update_peak(nav, p.dd_peak_window_h)
+    if p.endgame_long > 0:
+        return _endgame(alpha, vol, current_w, nav, st, p)
     a = alpha.dropna()
     trend = float(regime.get("mkt_trend", 0.0) or 0.0)
     risk_on = float(np.clip(regime.get("risk_on", 0.5) if pd.notna(regime.get("risk_on")) else 0.5, 0, 1))
@@ -217,6 +224,39 @@ def _absolute(s, alpha, vol, recent_returns, current_w, nav, st, p, risk_on, tre
         "vol_scale": scale,
         "n": int((w != 0).sum()),
         "can_short": can_short,
+    }
+    return _band(w, current_w, nav, p), diag
+
+
+def _endgame(alpha, vol, current_w, nav, st, p):
+    """Fixed net-long inverse-vol basket; flat if the contest return breaches the floor.
+    Caps, gross limit, drawdown governor and no-trade band still apply."""
+    uni = alpha.index[alpha.notna()]
+    ret = nav / p.initial_nav - 1
+    # sticky: once any recent decision-time NAV breached the floor, stay flat (no re-entry whipsaw)
+    worst = min(st.nav_hist) if st.nav_hist else nav
+    floor_hit = min(ret, worst / p.initial_nav - 1) <= p.endgame_floor_return
+    v = vol.reindex(uni).replace(0, np.nan)
+    v = v.fillna(v.median())
+    base = (1 / v) / (1 / v).sum()
+    raw = base * (0.0 if floor_hit else p.endgame_long)
+    caps = pd.Series({k: (p.max_weight_major if k in p.majors else p.max_weight) for k in raw.index})
+    raw = raw.clip(-caps, caps)
+    if raw.abs().sum() > p.max_gross:
+        raw = raw / raw.abs().sum() * p.max_gross
+    m = drawdown_multiplier(nav, st.peak_nav, p)
+    raw = raw * m
+    st.active = {k: 1 for k in raw.index if raw[k] > 0}
+    w = raw.reindex(current_w.index.union(raw.index).union(alpha.index)).fillna(0.0)
+    diag = {
+        "gross": float(w.abs().sum()),
+        "net": float(w.sum()),
+        "dd_mult": m,
+        "n": int((w != 0).sum()),
+        "endgame": True,
+        "endgame_floor_hit": bool(floor_hit),
+        "contest_return": round(ret, 5),
+        "can_short": False,
     }
     return _band(w, current_w, nav, p), diag
 

@@ -2,6 +2,20 @@
 
 All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTROL.md`.
 
+## v1.3-endgame-long — 2026-10-10 (live, tournament end-game, team decision)
+
+* **Situation:** contest return −2.47 % (15th of 24 Indian teams), 4–7 days left. Every gate needs a +3 % … +13 %
+  rise to turn up, so the trend book (≈ 13 % net short) had ~1–2 % chance to finish positive. A negative
+  return makes every scored ratio negative, so only a positive finish keeps a top-5 chance.
+* **Change:** `endgame_long: 0.60` — hold a fixed 60 % net-long inverse-vol basket of the 5 coins (gates
+  ignored); `endgame_floor_return: −0.045` — if the contest return reaches −4.5 % the book goes flat with
+  market orders and stays flat (sticky), to protect the top-20 regional cut (≈ −5 %). Caps, 1× limit,
+  compliance gate, drawdown governor and activity guard unchanged.
+* **Evidence** (540 days of hourly history, every 4/7-day window, from −2.47 %): P(finish > 0) current book
+  1–2 %; 60 % long 20–29 % but P(< −5 %) 17–27 %; 60 % long **with the floor 17–22 %, P(< −5 %) 9–10 %**.
+  There is no directional edge (median unchanged); this is an explicit, documented tournament bet.
+* **Rollback condition:** none (floor is the risk control).
+
 ## v1.2-endgame — 2026-10-08 (live, Tier 4 parameter change with evidence)
 
 * **Situation:** NAV −1.95 % after the Oct 7 market drop, drawdown 2.8 % (just below the 3 % governor

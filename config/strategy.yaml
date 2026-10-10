@@ -1,6 +1,6 @@
 # Team105 production strategy configuration. Every live change must be a git
 # commit to this file (or code) with a CHANGELOG entry -- see docs/CHANGE_CONTROL.md.
-version: "v1.2-endgame"
+version: "v1.3-endgame-long"
 
 strategy:
   sleeves: ["tgate"]
@@ -25,6 +25,10 @@ policy:
   max_gross: 0.95                      # 1x rule, minus a 5% cash buffer for fees / rounding
   max_weight: 0.30
   max_weight_major: 0.40
+  # v1.3 (2026-10-10, tournament end-game, chosen by the team): fixed 60 % net-long inverse-vol basket,
+  # gates ignored; go flat (sticky, market orders) if contest return <= -4.5 % to protect the top-20 cut.
+  endgame_long: 0.60
+  endgame_floor_return: -0.045
   dd_soft: 0.06                        # v1.2: was 0.03 -- the brake protected a lead; now we are behind
   dd_hard: 0.15                        # v1.2: was 0.10
   dd_floor: 0.25
