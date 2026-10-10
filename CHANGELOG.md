@@ -2,6 +2,17 @@
 
 All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTROL.md`.
 
+## v1.5-endgame-optimised — 2026-10-10 (live, end-game refinement)
+
+* **Analysis (R10, `research/endgame_multivar.py`):** joint bootstrap of the 5-coin hourly return matrix; grid over
+  basket composition (inverse-vol, equal, BTC/ETH, min-variance, max-vol), exposure schedule (constant, Browne
+  time-scaled goal-seeking, CPPI floor-proximity), lock and floor; selected on the first half of history,
+  validated on the second half.
+* **Findings:** coins are 70–84 % correlated, so composition hardly matters; constant exposure beat the
+  time-varying schedules; the binding trade-off is exposure × floor distance (gap risk through the floor).
+* **Change:** `endgame_long` 0.60 → 0.90, `endgame_floor_return` −0.045 → −0.042 (lock stays +0.25 %).
+  Out-of-sample P(>0) / P(< −5 %): 3.5 days 25 %/7 % → 33 %/8 %; 6.5 days 35 %/9 % → 37 %/7 %.
+
 ## v1.4-endgame-goal-lock — 2026-10-10 (live, end-game refinement)
 
 * **Analysis (R9, `research/endgame_optimal.py`):** maximise P(X_T ≥ 0) from x0 = −2.47 % with a floor L = −4.5 %.

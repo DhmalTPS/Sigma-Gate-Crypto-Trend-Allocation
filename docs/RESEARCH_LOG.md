@@ -153,6 +153,15 @@ Objective: maximise P(finish > 0) from −2.47 % with a −4.5 % floor protectin
 Lock-in is the optimal-stopping result for goal-reaching problems; 95 % exposure was rejected for gap risk through the
 floor. Deployed: 60 % with a +0.25 % lock (v1.4).
 
+## R10. Multivariable end-game optimisation (2026-10-10) — `research/endgame_multivar.py`
+
+Joint block bootstrap of the hourly 5×5 return matrix (correlations 0.70–0.84), ~1,200 configurations (composition ×
+exposure schedule × lock × floor), selected in-sample (first half), validated out-of-sample (second half).
+Composition and time-varying schedules (Browne goal-seeking, CPPI) did not beat constant exposure; the trade-off
+is exposure versus floor distance. Chosen: 90 % inverse-vol, lock +0.25 %, floor −4.2 % — out-of-sample P(>0)
+33 % (3.5 d) / 37 % (6.5 d) with P(< −5 %) 7–8 %, versus 25 % / 35 % for v1.4 at similar risk. No method can
+exceed the zero-drift optional-stopping bound (x0 − L)/(G − L) ≈ 39 % for these barriers; v1.5 sits close to it.
+
 ## Honest limitations
 
 * 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.
