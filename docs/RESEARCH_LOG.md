@@ -139,6 +139,20 @@ result came from one lucky rebalance hour; all other checks (lookback × top-K g
 removed, excess over hold, leave-one-out) shared that hour and inherited the luck. **Verdict: artefact, not
 an edge. Equity-token sleeve stays rejected.** Lesson: always vary *when* a rule trades, not only its parameters.
 
+## R9. Optimal end-game bet (live, 2026-10-10) — `research/endgame_optimal.py`
+
+Objective: maximise P(finish > 0) from −2.47 % with a −4.5 % floor protecting the top-20 cut. Kolmogorov backward PDE
+(Crank–Nicolson) and a real-data block bootstrap agree within a few points. P(>0), 4 / 7 days left (bootstrap):
+
+| Exposure | no lock | lock at +0.15 % | P(< −5 %) |
+|---|---|---|---|
+| 30 % | 5 % / 11 % | 7 % / 17 % | 1–2 % |
+| **60 %** | 18 % / 23 % | **30 % / 40 %** | 7–12 % |
+| 95 % | 24 % / 23 % | 41 % / 44 % | 18–27 % |
+
+Lock-in is the optimal-stopping result for goal-reaching problems; 95 % exposure was rejected for gap risk through the
+floor. Deployed: 60 % with a +0.25 % lock (v1.4).
+
 ## Honest limitations
 
 * 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.

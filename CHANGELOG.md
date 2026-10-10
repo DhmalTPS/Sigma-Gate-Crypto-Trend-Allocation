@@ -2,6 +2,19 @@
 
 All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTROL.md`.
 
+## v1.4-endgame-goal-lock — 2026-10-10 (live, end-game refinement)
+
+* **Analysis (R9, `research/endgame_optimal.py`):** maximise P(X_T ≥ 0) from x0 = −2.47 % with a floor L = −4.5 %.
+  Solved the Kolmogorov backward PDE u_t + b u_x + ½s²u_xx = 0 (Crank–Nicolson) and cross-checked with a stationary
+  bootstrap of real hourly basket returns (fat tails, jumps, hourly monitoring, fees). Closed-form bound for
+  μ = 0, T → ∞: (x0 − L)/(G − L) ≈ 44 %.
+* **Finding:** a goal-lock (go flat for good once the target is reached) nearly doubles success at unchanged
+  floor risk. 60 % exposure: P(>0) 15–23 % → 24–40 %, P(< −5 %) 7–12 % either way. 95 % exposure adds little
+  success but doubles gap-through-floor risk (18–21 %) — rejected.
+* **Change:** `endgame_goal_return: 0.0025` (lock at +0.25 %, margin for exit fee and valuation lag); both locks
+  sticky and persisted in state; lock exits use market orders; activity guard keeps ≥ 2 fills/day while flat
+  (0.5 % BTC buy, closed next cycle, ≈ 0.001 % NAV/day).
+
 ## v1.3-endgame-long — 2026-10-10 (live, tournament end-game, team decision)
 
 * **Situation:** contest return −2.47 % (15th of 24 Indian teams), 4–7 days left. Every gate needs a +3 % … +13 %

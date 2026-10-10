@@ -124,3 +124,25 @@ def test_endgame_long_basket_and_floor():
     assert d["endgame"] and (w >= 0).all() and abs(w.sum() - 0.60) < 1e-6
     w2, d2 = target_weights(alpha, vol, regime, rets, w, 95_400, PolicyState(100_900), p)
     assert d2["endgame_floor_hit"] and w2.abs().sum() == 0  # contest return -4.6% -> flat
+
+
+def test_endgame_goal_lock_is_sticky():
+    from dataclasses import replace as _r
+
+    alpha, vol, rets, regime = _row(5)
+    p = _r(
+        PolicyParams(sizing="absolute"),
+        endgame_long=0.60,
+        endgame_goal_return=0.0025,
+        band_abs=0.0,
+        band_rel=0.0,
+        max_weight=0.30,
+        max_weight_major=0.40,
+        dd_soft=0.06,
+        dd_hard=0.15,
+    )
+    st = PolicyState(100_900)
+    w, d = target_weights(alpha, vol, regime, rets, pd.Series(dtype=float), 100_300, st, p)
+    assert st.endgame_lock == "goal" and w.abs().sum() == 0
+    w2, _ = target_weights(alpha, vol, regime, rets, w, 99_000, st, p)  # falls back below 0: stays flat
+    assert w2.abs().sum() == 0

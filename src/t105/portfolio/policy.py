@@ -47,6 +47,7 @@ class PolicyParams:
     # ignoring the trend gates, because a negative contest return makes every scored ratio negative.
     endgame_long: float = 0.0
     endgame_floor_return: float = -0.045  # below this contest return -> flat (protect the top-20 cut)
+    endgame_goal_return: float = 1.0  # at/above this contest return -> lock in: flat for good (R9)
     initial_nav: float = 100_000.0
 
 
@@ -55,6 +56,7 @@ class PolicyState:
     peak_nav: float = 0.0
     active: dict = field(default_factory=dict)  # pair -> +1 / -1 for open positions (hysteresis)
     nav_hist: list = field(default_factory=list)  # recent decision-time NAVs for the rolling peak
+    endgame_lock: str = ""  # "" | "goal" | "floor" -- sticky, persisted by the live runner
 
     def update_peak(self, nav: float, window: int) -> float:
         if window <= 0:
@@ -235,7 +237,12 @@ def _endgame(alpha, vol, current_w, nav, st, p):
     ret = nav / p.initial_nav - 1
     # sticky: once any recent decision-time NAV breached the floor, stay flat (no re-entry whipsaw)
     worst = min(st.nav_hist) if st.nav_hist else nav
-    floor_hit = min(ret, worst / p.initial_nav - 1) <= p.endgame_floor_return
+    if not st.endgame_lock:
+        if min(ret, worst / p.initial_nav - 1) <= p.endgame_floor_return:
+            st.endgame_lock = "floor"
+        elif ret >= p.endgame_goal_return:
+            st.endgame_lock = "goal"
+    floor_hit = bool(st.endgame_lock)
     v = vol.reindex(uni).replace(0, np.nan)
     v = v.fillna(v.median())
     base = (1 / v) / (1 / v).sum()
@@ -255,6 +262,7 @@ def _endgame(alpha, vol, current_w, nav, st, p):
         "n": int((w != 0).sum()),
         "endgame": True,
         "endgame_floor_hit": bool(floor_hit),
+        "endgame_lock": st.endgame_lock,
         "contest_return": round(ret, 5),
         "can_short": False,
     }

@@ -229,6 +229,7 @@ class Bot:
             peak_nav=self.state["peak_nav"],
             active=self.state.get("active", {}),
             nav_hist=self.state.get("nav_hist", []),
+            endgame_lock=self.state.get("endgame_lock", ""),
         )
         breaker = time.time() < self.state.get("breaker_until", 0)
         if 1 - nav / self.state["peak_nav"] >= L.breaker_dd and not breaker:
@@ -252,6 +253,9 @@ class Bot:
             w = w * 0.0
         self.state["active"] = st.active
         self.state["nav_hist"] = st.nav_hist
+        if st.endgame_lock and not self.state.get("endgame_lock"):
+            self.audit.write("health", {"event": "endgame_lock", "kind": st.endgame_lock, "nav": nav})
+        self.state["endgame_lock"] = st.endgame_lock
 
         # 6) orders (deployment keys never trade before the contest window opens)
         not_before = pd.Timestamp(0, tz="UTC")
@@ -348,9 +352,13 @@ class Bot:
         else:
             held = cur_w[cur_w.abs() > lo]
             if len(held) == 0:
-                return []
-            j = held.abs().idxmax()
-            step = -float(np.sign(held[j])) * lo
+                # flat book (e.g. end-game lock): a tiny 0.5 % buy of the calmest coin; the next cycle's
+                # target (0) closes it -> 2 fills for the day at ~0.001 % NAV cost
+                j = "BTC/USD" if "BTC/USD" in gap.index else gap.index[0]
+                step = lo
+            else:
+                j = held.abs().idxmax()
+                step = -float(np.sign(held[j])) * lo
         wg = cur_w.copy()
         wg[j] = cur_w.get(j, 0.0) + step
         self.audit.write(

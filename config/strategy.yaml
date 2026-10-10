@@ -1,6 +1,6 @@
 # Team105 production strategy configuration. Every live change must be a git
 # commit to this file (or code) with a CHANGELOG entry -- see docs/CHANGE_CONTROL.md.
-version: "v1.3-endgame-long"
+version: "v1.4-endgame-goal-lock"
 
 strategy:
   sleeves: ["tgate"]
@@ -29,6 +29,8 @@ policy:
   # gates ignored; go flat (sticky, market orders) if contest return <= -4.5 % to protect the top-20 cut.
   endgame_long: 0.60
   endgame_floor_return: -0.045
+  # v1.4 (R9 stochastic-control analysis): lock in once the contest return reaches +0.25 % -> flat for good.
+  endgame_goal_return: 0.0025
   dd_soft: 0.06                        # v1.2: was 0.03 -- the brake protected a lead; now we are behind
   dd_hard: 0.15                        # v1.2: was 0.10
   dd_floor: 0.25
