@@ -53,7 +53,7 @@ decision, order and fill.
 | Worst drawdown in any 14-day window | **6.1 %** | — |
 | Robustness | all 13 single-parameter perturbations Sharpe > 0.5 | — |
 
-**Live contest:** the live return on 2026-10-15 was **−4.12 %**. The trend system (v1.1, then v1.2 from 2026-10-08) traded from the open until 2026-10-10, when the contest return was −2.47 % (15th of 24 Indian teams). From 2026-10-10 the bot switched to a documented end-game bet: a fixed net-long inverse-vol basket of the same 5 coins with a sticky loss floor and a profit lock (v1.3–v1.5, [`CHANGELOG.md`](CHANGELOG.md), research R9–R10). The final figure therefore reflects that end-game basket, not the trend strategy alone. The chart and the table below are the interim snapshot from 2026-10-04 12:00 to 2026-10-06 11:00 UTC.
+**Live contest:** the last live reading recorded, on 2026-10-15 (the contest ran to 2026-10-17), was **−4.12 %**. The trend system (v1.1, then v1.2 from 2026-10-08) traded from the open until 2026-10-10, when the contest return was −2.47 % (15th of 24 Indian teams). From 2026-10-10 the bot switched to a documented end-game bet: a fixed net-long inverse-vol basket of the same 5 coins with a sticky loss floor and a profit lock (v1.3–v1.5, [`CHANGELOG.md`](CHANGELOG.md), research R9–R10). The final figure therefore reflects that end-game basket, not the trend strategy alone. The chart and the table below are the interim snapshot from 2026-10-04 12:00 to 2026-10-06 11:00 UTC.
 
 ![Live contest NAV and drawdown](docs/img/live_nav.png)
 
