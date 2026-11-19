@@ -18,13 +18,13 @@ needs a human to place a trade.
 
 ## 0. Before you start
 
-- [ ] Accept the AWS invite email (captain or teammate inbox) — **expires 7 days** after sending.
+- [ ] Accept the AWS invite email sent to the registered address — **expires 7 days** after sending.
 - [ ] Push this repo to a **public GitHub repo** (the VM clones it). Check `extra_info/` is not in it.
 - [ ] Keep the key files on your laptop only (`extra_info/api_keys/`, git-ignored).
 
 ## 1. Sign in
 
-1. Open the portal: **https://d-906625dad1.awsapps.com/start**
+1. Open the AWS access-portal link from the organizer's invite email.
 2. Username = the email the invite was sent to → enter the emailed verification code →
    set a password → set up MFA (any authenticator app).
 3. On the AWS access portal: click the **AWS Account** tile → on the `Hackathon-TeamX` line

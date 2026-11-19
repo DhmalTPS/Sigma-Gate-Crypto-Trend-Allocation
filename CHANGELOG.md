@@ -26,7 +26,7 @@ All strategy/config changes, newest first. Format and rules: `docs/CHANGE_CONTRO
   sticky and persisted in state; lock exits use market orders; activity guard keeps ≥ 2 fills/day while flat
   (0.5 % BTC buy, closed next cycle, ≈ 0.001 % NAV/day).
 
-## v1.3-endgame-long — 2026-10-10 (live, tournament end-game, team decision)
+## v1.3-endgame-long — 2026-10-10 (live, tournament end-game decision)
 
 * **Situation:** contest return −2.47 % (15th of 24 Indian teams), 4–7 days left. Every gate needs a +3 % … +13 %
   rise to turn up, so the trend book (≈ 13 % net short) had ~1–2 % chance to finish positive. A negative

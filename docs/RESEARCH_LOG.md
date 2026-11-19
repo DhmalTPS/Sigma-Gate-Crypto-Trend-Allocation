@@ -94,12 +94,14 @@ whole position. Plain sign gates: **110× NAV turnover, $8.5k fees, Sharpe 0.10*
 | 1.0 | 13× | $964 | 0.56 | 10.7 % |
 
 (before the rolling-peak fix below). Plateau 0.25–1.0 → we take the middle, 0.5σ.
+Re-run with the rolling-peak governor (v1.1 settings otherwise): dead-band 0 → 286× turnover, $22,356
+fees, Sharpe 0.25; dead-band 0.5 → 41×, $3,133, Sharpe 0.94.
 
 **Drawdown governor peak.** Measured from the all-time peak, the governor kept a
 16-month backtest de-risked for months (avg gross 0.16). The contest is 14 days, so the
 governor now uses the **rolling 14‑day peak**, which gives the same behaviour during the
 contest and an honest backtest. Result (v1.1): Sharpe 0.94, MaxDD 10.5 %, fees $3.1k;
-all 13 single-parameter perturbations positive (README §6).
+all 13 single-parameter perturbations positive (README §8).
 
 ## R7. End-game re-calibration (live, 2026-10-08) — `research/endgame.py`
 
@@ -164,7 +166,8 @@ exceed the zero-drift optional-stopping bound (x0 − L)/(G − L) ≈ 39 % for 
 
 ## Honest limitations
 
-* 17 months is ~1 bull/bear cycle; PSR 0.78 is suggestive, not conclusive.
+* 17 months is ~1 bull/bear cycle; PSR 0.78 (R4 ensemble; 0.86 for v1.1 in the full engine) is
+  suggestive, not conclusive.
 * The middle third (choppy bear) lost money — trend-following's known failure mode.
   The drawdown governor and half-size shorts are what bound it.
 * The backtest assumes Roostoo fills a passive limit only when the next bar trades
