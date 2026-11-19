@@ -51,7 +51,7 @@ decision, order and fill.
 | Worst drawdown in any 14-day window | **6.1 %** | — |
 | Robustness | all 13 single-parameter perturbations Sharpe > 0.5 | — |
 
-**Live contest:** the final return at contest end (2026-10-15) was **−4.34 %**. The chart and the table below are the interim snapshot from 2026-10-04 12:00 to 2026-10-06 11:00 UTC.
+**Live contest:** the final return at contest end (2026-10-15) was **−4.12 %**. The chart and the table below are the interim snapshot from 2026-10-04 12:00 to 2026-10-06 11:00 UTC.
 
 ![Live contest NAV and drawdown](docs/img/live_nav.png)
 
